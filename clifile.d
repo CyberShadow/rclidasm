@@ -203,6 +203,36 @@ struct CILFile
 	}
 }
 
+struct DefaultSerializer
+{
+	void putValue(F, D)(Disassembler d, in ref F field, in ref D def)
+		if (is(typeof(field) == typeof(def)))
+	{
+		d.putVar!(typeof(field))(field, def);
+	}
+}
+
+/// For zero-terminated strings in fixed-length arrays.
+struct CStrArrSerializer
+{
+	void putValue(F, D)(Disassembler d, in ref F field, in ref D def)
+		if (is(typeof(field) == typeof(def)))
+	{
+		auto arr = field[];
+		while (arr.length && arr[$-1] == 0)
+			arr = arr[0..$-1];
+		d.writer.putString(cast(char[])arr);
+	}
+}
+
+auto getSerializer(T, string name)()
+{
+	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Name")
+		return CStrArrSerializer();
+	else
+		return DefaultSerializer();
+}
+
 private static immutable initOf(T) = T.init;
 
 struct Disassembler
@@ -220,21 +250,6 @@ private:
 
 	Writer writer;
 
-	void putField(T, string name, F, D)(in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Name")
-		{
-			static assert(is(F == ubyte[8]));
-			auto arr = field[];
-			while (arr.length && arr[$-1] == 0)
-				arr = arr[0..$-1];
-			writer.putString(cast(char[])arr);
-		}
-		else
-			putVar!(typeof(field))(field, def);
-	}
-
 	void putVar(T)(ref T var, in ref T def = initOf!T)
 	{
 		static if (is(T == struct))
@@ -247,7 +262,7 @@ private:
 
 				enum name = __traits(identifier, var.tupleof[i]);
 				writer.beginTag(name);
-				putField!(T, name)(f, def.tupleof[i]);
+				getSerializer!(T, name).putValue(this, f, def.tupleof[i]);
 				writer.endTag();
 			}
 			writer.endStruct();
