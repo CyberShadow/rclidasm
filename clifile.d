@@ -258,7 +258,7 @@ private:
 			writer.beginStruct();
 			foreach (ref A a; var)
 			{
-				writer.beginTag(A.stringof);
+				writer.beginTag(Unqual!A.stringof);
 				putVar(a);
 				writer.endTag();
 			}
@@ -275,7 +275,7 @@ struct Writer
 	{
 		putIndent();
 		debug foreach (char c; s)
-			assert(isAlphaNum(c) || c.isOneOf("._"));
+			assert(isAlphaNum(c) || c.isOneOf("._"), "Bad tag name: " ~ s);
 		buf.put(s);
 	}
 
