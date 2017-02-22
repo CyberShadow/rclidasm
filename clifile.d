@@ -220,6 +220,21 @@ private:
 
 	Writer writer;
 
+	void putField(T, string name, F, D)(in ref F field, in ref D def)
+		if (is(typeof(field) == typeof(def)))
+	{
+		static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Name")
+		{
+			static assert(is(F == ubyte[8]));
+			auto arr = field[];
+			while (arr.length && arr[$-1] == 0)
+				arr = arr[0..$-1];
+			writer.putString(cast(char[])arr);
+		}
+		else
+			putVar!(typeof(field))(field, def);
+	}
+
 	void putVar(T)(ref T var, in ref T def = initOf!T)
 	{
 		static if (is(T == struct))
@@ -232,7 +247,7 @@ private:
 
 				enum name = __traits(identifier, var.tupleof[i]);
 				writer.beginTag(name);
-				putVar!(typeof(f))(f, def.tupleof[i]);
+				putField!(T, name)(f, def.tupleof[i]);
 				writer.endTag();
 			}
 			writer.endStruct();
@@ -297,13 +312,13 @@ struct Writer
 		buf.put("}");
 	}
 
-	void putValue(string s)
+	void putValue(in char[] s)
 	{
 		buf.put(" ");
 		buf.put(s);
 	}
 
-	void putString(string s)
+	void putString(in char[] s)
 	{
 		// TODO: use WYSIWYG literals when appropriate
 		buf.put(` "`);
