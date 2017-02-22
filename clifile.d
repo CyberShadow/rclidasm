@@ -309,7 +309,7 @@ struct Writer
 		buf.put(` "`);
 		foreach (char c; s)
 			if (c < 0x20)
-				buf.put(`\x%02D`.format(c)); // TODO: Don't allocate
+				buf.put(`\x%02X`.format(c)); // TODO: Don't allocate
 			else
 			{
 				if (c == '"' || c == '\\')
