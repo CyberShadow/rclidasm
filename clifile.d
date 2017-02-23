@@ -335,6 +335,26 @@ struct UnixTimestampSerializer
 	}
 }
 
+/// Serializer for unions. fieldIndex indicates the index of the union
+/// field we will be looking at.
+struct UnionSerializer(uint fieldIndex)
+{
+	void putValue(F, D)(Disassembler d, in ref F field, in ref D def)
+		if (is(typeof(field) == typeof(def)))
+	{
+		d.writer.beginStruct();
+		foreach (i, ref f; field.tupleof)
+			static if (i == fieldIndex)
+			{
+				enum name = __traits(identifier, field.tupleof[i]);
+				d.writer.beginTag(name);
+				getSerializer!(F, name).putValue(d, f, def.tupleof[i]);
+				d.writer.endTag();
+			}
+		d.writer.endStruct();
+	}
+}
+
 auto getSerializer(T, string name)()
 {
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "TimeDateStamp")
@@ -442,6 +462,12 @@ auto getSerializer(T, string name)()
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name.isOneOf("VirtualAddress", "SizeOfRawData", "PointerToRawData"))
 		return HexIntegerSerializer();
 	else
+	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Misc")
+		return UnionSerializer!1(); // VirtualSize
+	else
+	static if (is(Unqual!T == IMAGE_SECTION_HEADER._Misc) && name == "VirtualSize")
+		return HexIntegerSerializer();
+	else
 	static if (is(Unqual!T == CILFile.Header) && name == "dataDirectories")
 		return SparseNamedIndexedArraySerializer!(
 			IMAGE_DIRECTORY_ENTRY_EXPORT,
@@ -504,7 +530,7 @@ private:
 		else
 		static if (is(T == union))
 		{
-			// TODO
+			static assert(false, "Can't serialize a union: " ~ T.stringof);
 		}
 		else
 		static if (is(T : ulong))
