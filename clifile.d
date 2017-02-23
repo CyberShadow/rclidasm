@@ -293,7 +293,7 @@ auto getSerializer(T, string name)()
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "SizeOfOptionalHeader")
 		return HexIntegerSerializer();
 	else
-	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name.isOneOf("Characteristics"))
+	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "Characteristics")
 		return ImplicitEnumBitmaskSerializer!(
 			IMAGE_FILE_RELOCS_STRIPPED,
 			IMAGE_FILE_EXECUTABLE_IMAGE,
@@ -316,7 +316,7 @@ auto getSerializer(T, string name)()
 			"AddressOfEntryPoint", "BaseOfCode", "BaseOfData", "ImageBase", "SectionAlignment", "SizeOfImage", "SizeOfHeaders"))
 		return HexIntegerSerializer();
 	else
-	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name.isOneOf("Subsystem"))
+	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name == "Subsystem")
 		return ImplicitEnumSerializer!(
 			IMAGE_SUBSYSTEM_UNKNOWN,
 			IMAGE_SUBSYSTEM_NATIVE,
@@ -334,7 +334,7 @@ auto getSerializer(T, string name)()
 			IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION,
 		)();
 	else
-	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name.isOneOf("Characteristics"))
+	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Characteristics")
 		return ImplicitEnumBitmaskSerializer!(
 			IMAGE_SCN_TYPE_REG,
 			IMAGE_SCN_TYPE_DSECT,
