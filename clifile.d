@@ -99,6 +99,15 @@ struct CLIFile
 	}
 	Header header;
 
+	// Non-zero data in the PE file that doesn't seem to be referenced
+	// by anything.
+	struct UnaccountedBlock
+	{
+		size_t offset;
+		ubyte[] data;
+	}
+	UnaccountedBlock[] unaccountedData;
+
 	this(ubyte[] bytes)
 	{
 		auto pe = PE(bytes);
@@ -116,6 +125,25 @@ struct CLIFile
 		header.dataDirectories = pe.dataDirectories;
 
 		header.sections = pe.sectionHeaders;
+
+		bool[] byteUsed = new bool[bytes.length];
+
+		// Mark header as used
+		byteUsed[0 .. cast(ubyte*)(pe.sectionHeaders.ptr + pe.sectionHeaders.length) - bytes.ptr] = true;
+
+		// ...
+
+		// Record unaccounted data
+		for (size_t offset = 0; offset < bytes.length; offset++)
+			if (!byteUsed[offset] && bytes[offset] != 0)
+			{
+				auto start = offset;
+				while (offset < bytes.length && !byteUsed[offset])
+					offset++;
+				while (offset > start && bytes[offset-1] == 0)
+					offset--;
+				unaccountedData ~= UnaccountedBlock(start, bytes[start .. offset-start]);
+			}
 	}
 }
 
@@ -390,6 +418,9 @@ auto getSerializer(T, string name)()
 		)();
 	else
 	static if (is(Unqual!T == IMAGE_DATA_DIRECTORY) && name.isOneOf("VirtualAddress", "Size"))
+		return HexIntegerSerializer();
+	else
+	static if (is(Unqual!T == CLIFile.UnaccountedBlock) && name == "offset")
 		return HexIntegerSerializer();
 	else
 		return DefaultSerializer();
