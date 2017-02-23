@@ -99,12 +99,12 @@ struct CLIFile
 	}
 	Header header;
 
-	this(void[] bytes)
+	this(ubyte[] bytes)
 	{
 		auto pe = PE(bytes);
 		header.dosHeader = *pe.dosHeader;
 		if (IMAGE_DOS_HEADER.sizeof < pe.dosHeader.e_lfanew)
-			header.dosStub = cast(ubyte[])bytes[IMAGE_DOS_HEADER.sizeof .. pe.dosHeader.e_lfanew];
+			header.dosStub = bytes[IMAGE_DOS_HEADER.sizeof .. pe.dosHeader.e_lfanew];
 		header.peHeader = *pe.ntHeaders;
 
 		// IMAGE_OPTIONAL_HEADER's IMAGE_DATA_DIRECTORY array is
@@ -554,7 +554,7 @@ private:
 void main()
 {
 	import std.file;
-	auto cli = CLIFile(read("Assembly-CSharp.dll"));
+	auto cli = CLIFile(cast(ubyte[])read("Assembly-CSharp.dll"));
 	auto disassembler = Disassembler(&cli);
 	write("Assembly-CSharp.rcli", disassembler.disassemble());
 }
