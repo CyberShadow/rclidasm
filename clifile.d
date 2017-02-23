@@ -462,10 +462,12 @@ private:
 		static if (is(T A : A[]))
 		{
 			writer.beginStruct();
-			foreach (ref A a; var)
+			foreach (i, ref A a; var)
 			{
 				writer.beginTag(Unqual!A.stringof);
-				putVar(a);
+				auto aDef = i < def.length ? def[i] : A.init;
+				if (a != aDef)
+					putVar!A(a, aDef);
 				writer.endTag();
 			}
 			writer.endStruct();
