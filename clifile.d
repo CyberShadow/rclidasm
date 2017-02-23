@@ -1,4 +1,4 @@
-module cilfile;
+module clifile;
 
 import std.ascii;
 import std.base64;
@@ -13,7 +13,7 @@ import ae.utils.time.format;
 
 mixin(importWin32!(q{winnt}));
 
-immutable IMAGE_DOS_HEADER cilDosHeader =
+immutable IMAGE_DOS_HEADER cliDosHeader =
 {
 	e_magic : 0x5A4D, // MZ
 	e_cblp : 0x90,
@@ -26,7 +26,7 @@ immutable IMAGE_DOS_HEADER cilDosHeader =
 	e_lfanew : 0x00000080,
 };
 
-immutable ubyte[] cilDosStub =
+immutable ubyte[] cliDosStub =
 [
 	0x0e, 0x1f, 0xba, 0x0e, 0x00, 0xb4, 0x09, 0xcd,
 	0x21, 0xb8, 0x01, 0x4c, 0xcd, 0x21, 0x54, 0x68,
@@ -38,7 +38,7 @@ immutable ubyte[] cilDosStub =
 	0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-immutable IMAGE_NT_HEADERS32 cilPEHeader =
+immutable IMAGE_NT_HEADERS32 cliPEHeader =
 {
 	Signature : 0x00004550, // "PE\0\0"
 	FileHeader :
@@ -65,13 +65,13 @@ immutable IMAGE_NT_HEADERS32 cilPEHeader =
 
 import ae.sys.windows.pe.pe;
 
-struct CILFile
+struct CLIFile
 {
 	struct Header
 	{
-		IMAGE_DOS_HEADER dosHeader = cilDosHeader;
-		ubyte[] dosStub = cilDosStub;
-		IMAGE_NT_HEADERS32 peHeader = cilPEHeader;
+		IMAGE_DOS_HEADER dosHeader = cliDosHeader;
+		ubyte[] dosStub = cliDosStub;
+		IMAGE_NT_HEADERS32 peHeader = cliPEHeader;
 		IMAGE_DATA_DIRECTORY[] dataDirectories;
 		IMAGE_SECTION_HEADER[] sections;
 
@@ -369,7 +369,7 @@ auto getSerializer(T, string name)()
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER._Misc) && name == "VirtualSize")
 		return HexIntegerSerializer();
 	else
-	static if (is(Unqual!T == CILFile.Header) && name == "dataDirectories")
+	static if (is(Unqual!T == CLIFile.Header) && name == "dataDirectories")
 		return SparseNamedIndexedArraySerializer!(
 			IMAGE_DIRECTORY_ENTRY_EXPORT,
 			IMAGE_DIRECTORY_ENTRY_IMPORT,
@@ -407,7 +407,7 @@ struct Disassembler
 	}
 
 private:
-	const(CILFile)* file;
+	const(CLIFile)* file;
 
 	Writer writer;
 
@@ -538,7 +538,7 @@ private:
 void main()
 {
 	import std.file;
-	auto cil = CILFile(read("Assembly-CSharp.dll"));
-	auto disassembler = Disassembler(&cil);
+	auto cli = CLIFile(read("Assembly-CSharp.dll"));
+	auto disassembler = Disassembler(&cli);
 	write("Assembly-CSharp.rcli", disassembler.disassemble());
 }
