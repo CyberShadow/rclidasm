@@ -270,6 +270,39 @@ struct ImplicitEnumSerializer(members...)
 	}
 }
 
+/// An array which might as well be a struct with all fields of the same type.
+/// Note: the array length is not represented (because entries with
+/// default values are omitted), and must be fixed or specified elsewhere.
+struct SparseNamedIndexedArraySerializer(members...)
+{
+	void putValue(F, D)(Disassembler d, in ref F field, in ref D def)
+		if (is(typeof(field) == typeof(def)))
+	{
+		d.writer.beginStruct();
+		foreach (i, ref a; field)
+		{
+			auto aDef = i < def.length ? def[i] : typeof(a).init;
+			if (a == aDef)
+				continue;
+		label:
+			switch (i)
+			{
+				foreach (memberIndex, member; members)
+				{
+					case member:
+						d.writer.beginTag(__traits(identifier, members[memberIndex]));
+						break label;
+				}
+				default:
+					d.writer.beginTag(text(i));
+			}
+			d.putVar!(typeof(a))(a, aDef);
+			d.writer.endTag();
+		}
+		d.writer.endStruct();
+	}
+}
+
 /// Bitmask using constants which are not declared as an actual enum.
 struct ImplicitEnumBitmaskSerializer(members...)
 {
@@ -408,6 +441,25 @@ auto getSerializer(T, string name)()
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name.isOneOf("VirtualAddress", "SizeOfRawData", "PointerToRawData"))
 		return HexIntegerSerializer();
+	else
+	static if (is(Unqual!T == CILFile.Header) && name == "dataDirectories")
+		return SparseNamedIndexedArraySerializer!(
+			IMAGE_DIRECTORY_ENTRY_EXPORT,
+			IMAGE_DIRECTORY_ENTRY_IMPORT,
+			IMAGE_DIRECTORY_ENTRY_RESOURCE,
+			IMAGE_DIRECTORY_ENTRY_EXCEPTION,
+			IMAGE_DIRECTORY_ENTRY_SECURITY,
+			IMAGE_DIRECTORY_ENTRY_BASERELOC,
+			IMAGE_DIRECTORY_ENTRY_DEBUG,
+			IMAGE_DIRECTORY_ENTRY_ARCHITECTURE,
+			IMAGE_DIRECTORY_ENTRY_GLOBALPTR,
+			IMAGE_DIRECTORY_ENTRY_TLS,
+			IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG,
+			IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT,
+			IMAGE_DIRECTORY_ENTRY_IAT,
+			IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT,
+			IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR,
+		)();
 	else
 	static if (is(Unqual!T == IMAGE_DATA_DIRECTORY) && name.isOneOf("VirtualAddress", "Size"))
 		return HexIntegerSerializer();
