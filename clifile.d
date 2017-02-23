@@ -158,6 +158,7 @@ immutable IMAGE_NT_HEADERS32 cilPEHeader =
 		SizeOfStackCommit : 0x1000,
 		SizeOfHeapReserve : 0x100000,
 		SizeOfHeapCommit : 0x1000,
+		NumberOfRvaAndSizes : 0x10,
 	},
 };
 
@@ -203,7 +204,15 @@ struct CILFile
 		if (IMAGE_DOS_HEADER.sizeof < pe.dosHeader.e_lfanew)
 			header.dosStub = cast(ubyte[])bytes[IMAGE_DOS_HEADER.sizeof .. pe.dosHeader.e_lfanew];
 		header.peHeader = *pe.ntHeaders;
-		// TODO header.dataDirectories =
+
+		// IMAGE_OPTIONAL_HEADER's IMAGE_DATA_DIRECTORY array is
+		// fixed-length, however the header specifies a variable
+		// number of entries. Thus, we ignore them and serialize them
+		// separately.
+
+		header.peHeader.OptionalHeader.DataDirectory[] = IMAGE_DATA_DIRECTORY.init; // Don't serialize
+		header.dataDirectories = pe.dataDirectories;
+
 		header.sections = pe.sectionHeaders;
 	}
 }
