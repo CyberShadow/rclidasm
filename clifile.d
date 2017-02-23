@@ -400,8 +400,8 @@ struct Disassembler
 {
 	string disassemble()
 	{
-		writer.beginTag("header");
-		putVar(file.header);
+		writer.beginTag("file");
+		putVar(*file);
 		writer.endTag();
 		return writer.buf.data;
 	}
