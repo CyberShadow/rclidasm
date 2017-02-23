@@ -585,7 +585,7 @@ private:
 void main()
 {
 	import std.file;
-	auto cli = CLIFile(cast(ubyte[])read("Assembly-CSharp.dll"));
+	auto cli = CLIFile(cast(ubyte[])read("test.exe"));
 	auto disassembler = Disassembler(&cli);
-	write("Assembly-CSharp.rcli", disassembler.disassemble());
+	write("test.rcli", disassembler.disassemble());
 }
