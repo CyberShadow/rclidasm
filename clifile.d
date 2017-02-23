@@ -1,6 +1,7 @@
 module cilfile;
 
 import std.ascii;
+import std.base64;
 import std.conv;
 import std.datetime;
 import std.string;
@@ -199,7 +200,8 @@ struct CILFile
 	{
 		auto pe = PE(bytes);
 		header.dosHeader = *pe.dosHeader;
-		// TODO dosStub
+		if (IMAGE_DOS_HEADER.sizeof < pe.dosHeader.e_lfanew)
+			header.dosStub = cast(ubyte[])bytes[IMAGE_DOS_HEADER.sizeof .. pe.dosHeader.e_lfanew];
 		header.peHeader = *pe.ntHeaders;
 		// TODO header.dataDirectories =
 		header.sections = pe.sectionHeaders;
@@ -454,6 +456,9 @@ private:
 			writer.putString(var);
 		}
 		else
+		static if (is(T : const(ubyte)[]))
+			writer.putData(var);
+		else
 		static if (is(T A : A[]))
 		{
 			writer.beginStruct();
@@ -518,6 +523,13 @@ struct Writer
 				buf.put(c);
 			}
 		buf.put('"');
+	}
+
+	void putData(in ubyte[] s)
+	{
+		buf.put(" [");
+		buf.put(Base64.encode(s)); // TODO: Don't allocate
+		buf.put("]");
 	}
 
 private:
