@@ -4,6 +4,7 @@ import std.ascii;
 import std.base64;
 import std.conv;
 import std.datetime;
+import std.range;
 import std.string;
 import std.traits;
 
@@ -518,7 +519,22 @@ struct Writer
 	void putData(in ubyte[] s)
 	{
 		buf.put(" [");
-		buf.put(Base64.encode(s)); // TODO: Don't allocate
+		// TODO: Don't allocate
+		if (s.length <= 64)
+			buf.put(Base64.encode(s));
+		else
+		{
+			buf.put("\n");
+			indent++;
+			foreach (c; s.chunks(48))
+			{
+				putIndent();
+				buf.put(Base64.encode(c));
+				buf.put("\n");
+			}
+			indent--;
+			putIndent();
+		}
 		buf.put("]");
 	}
 
