@@ -99,11 +99,13 @@ auto clone(T)(ref T var)
 
 struct CLIFile
 {
+	size_t size;
+
 	struct Header
 	{
 		IMAGE_DOS_HEADER dosHeader = cliDosHeader;
 		ubyte[] dosStub = cliDosStub;
-		IMAGE_NT_HEADERS32 peHeader = cliPEHeader;
+		IMAGE_NT_HEADERS32 ntHeaders = cliPEHeader;
 		IMAGE_DATA_DIRECTORY[] dataDirectories = new IMAGE_DATA_DIRECTORY[16];
 		IMAGE_SECTION_HEADER[] sections;
 
@@ -145,22 +147,24 @@ struct CLIFile
 		header.dosHeader = *pe.dosHeader;
 		if (IMAGE_DOS_HEADER.sizeof < pe.dosHeader.e_lfanew)
 			header.dosStub = bytes[IMAGE_DOS_HEADER.sizeof .. pe.dosHeader.e_lfanew];
-		header.peHeader = *pe.ntHeaders;
+		header.ntHeaders = *pe.ntHeaders;
 
 		// IMAGE_OPTIONAL_HEADER's IMAGE_DATA_DIRECTORY array is
 		// fixed-length, however the header specifies a variable
 		// number of entries. Thus, we ignore them and serialize them
 		// separately.
 
-		header.peHeader.OptionalHeader.DataDirectory[] = IMAGE_DATA_DIRECTORY.init; // Don't serialize
+		header.ntHeaders.OptionalHeader.DataDirectory[] = IMAGE_DATA_DIRECTORY.init; // Don't serialize
 		header.dataDirectories = pe.dataDirectories;
 
 		header.sections = pe.sectionHeaders;
 
 		bool[] byteUsed = new bool[bytes.length];
 
-		// Mark header as used
-		byteUsed[0 .. cast(ubyte*)(pe.sectionHeaders.ptr + pe.sectionHeaders.length) - bytes.ptr] = true;
+		// Mark headers as used
+		byteUsed[0 .. cast(ubyte*)(pe.dataDirectories.ptr + pe.dataDirectories.length) - bytes.ptr] = true;
+		byteUsed[cast(ubyte*)(pe.sectionHeaders.ptr                           ) - bytes.ptr ..
+		         cast(ubyte*)(pe.sectionHeaders.ptr + pe.sectionHeaders.length) - bytes.ptr] = true;
 
 		// ...
 
@@ -173,8 +177,36 @@ struct CLIFile
 					offset++;
 				while (offset > start && bytes[offset-1] == 0)
 					offset--;
-				unaccountedData ~= UnaccountedBlock(start, bytes[start .. offset-start]);
+				unaccountedData ~= UnaccountedBlock(start, bytes[start .. offset]);
 			}
+
+		size = bytes.length;
+	}
+
+	ubyte[] compile()
+	{
+		ubyte[] result;
+		result ~= header.dosHeader.bytes;
+		if (IMAGE_DOS_HEADER.sizeof < header.dosHeader.e_lfanew)
+		{
+			enforce(header.dosStub.length == header.dosHeader.e_lfanew - IMAGE_DOS_HEADER.sizeof, "DOS stub length / e_lfanew mismatch");
+			result ~= header.dosStub;
+		}
+		result ~= header.ntHeaders.bytes[0 .. IMAGE_NT_HEADERS32.OptionalHeader.offsetof + IMAGE_NT_HEADERS32.OptionalHeader.DataDirectory.offsetof];
+		result ~= header.dataDirectories.bytes;
+		result.length = header.dosHeader.e_lfanew + header.ntHeaders.OptionalHeader.offsetof + header.ntHeaders.FileHeader.SizeOfOptionalHeader;
+		result ~= header.sections.bytes;
+
+		foreach (block; unaccountedData)
+		{
+			if (result.length < block.offset + block.data.length)
+				result.length = block.offset + block.data.length;
+			result[block.offset .. block.offset+block.data.length] = block.data;
+		}
+
+		result.length = size;
+
+		return result;
 	}
 }
 
@@ -1143,13 +1175,17 @@ private:
 void main()
 {
 	import std.file;
-	auto cli = CLIFile(cast(ubyte[])read("test.exe"));
+	auto exe = cast(ubyte[])read("test.exe");
+	auto cli = CLIFile(exe);
 	auto disassembler = Disassembler(&cli);
 	auto disassembly = disassembler.disassemble();
 	write("test.rcli", disassembly);
 	auto assembler = Assembler(disassembly);
 	auto cli2 = assembler.assemble();
-	auto disassembler2 = Disassembler(&cli2);
+	auto exe2 = cli2.compile();
+	write("test2.exe", exe2);
+	auto cli3 = CLIFile(exe2);
+	auto disassembler2 = Disassembler(&cli3);
 	auto disassembly2 = disassembler2.disassemble();
 	write("test2.rcli", disassembly2);
 }
