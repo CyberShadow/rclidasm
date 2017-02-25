@@ -5,7 +5,7 @@ import std.traits;
 
 import rclidasm.common;
 import rclidasm.clifile;
-import rclidasm.serialization;
+import rclidasm.representation;
 import rclidasm.writer;
 
 struct Disassembler

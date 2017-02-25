@@ -1,4 +1,4 @@
-module rclidasm.serialization;
+module rclidasm.representation;
 
 import std.conv;
 import std.datetime;

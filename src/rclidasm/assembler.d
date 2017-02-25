@@ -10,7 +10,7 @@ import std.traits;
 import rclidasm.clifile;
 import rclidasm.common;
 import rclidasm.reader;
-import rclidasm.serialization;
+import rclidasm.representation;
 
 T parseIntLiteral(T)(string s)
 {
