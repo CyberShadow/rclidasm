@@ -37,7 +37,6 @@ struct Tokenizer
 
 	Token front;
 	bool empty = false;
-	int line, column;
 
 	void popFront()
 	{
@@ -85,8 +84,12 @@ struct Tokenizer
 		}
 	}
 
+	struct Position { int line, column; }
+	@property Position position() { return Position(line, column); }
+
 private:
 	string s;
+	int line, column;
 
 	void advance(size_t num = 1)
 	{

@@ -806,7 +806,7 @@ struct Assembler
 		}
 		catch (Exception e)
 		{
-			throw new Exception("Error at %d,%d".format(reader.tokenizer.line, reader.tokenizer.column), e);
+			throw new Exception("Error at %d,%d".format(reader.position.tupleof), e);
 		}
 	}
 

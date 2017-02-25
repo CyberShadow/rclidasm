@@ -8,8 +8,6 @@ import tokenizer;
 /// SDLang parser (on top of tokenizer).
 struct Reader
 {
-	Tokenizer tokenizer;
-
 	@disable this();
 
 	this(string s)
@@ -92,7 +90,11 @@ struct Reader
 		return skipOver(Tokenizer.Token.Type.endData);
 	}
 
+	@property Tokenizer.Position position() { return tokenizer.position; }
+
 private:
+	Tokenizer tokenizer;
+
 	/// Skip over node delimiters.
 	void skipDelims()
 	{
