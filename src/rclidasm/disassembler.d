@@ -35,7 +35,7 @@ private:
 
 				enum name = __traits(identifier, var.tupleof[i]);
 				writer.beginTag(name);
-				getSerializer!(T, name).putValue(this, f, def.tupleof[i]);
+				getRepresentation!(T, name).putValue(this, f, def.tupleof[i]);
 				writer.endTag();
 			}
 			writer.endStruct();

@@ -64,7 +64,7 @@ private:
 						case fieldName:
 						{
 							static assert(is(typeof(f = f)), typeof(f).stringof);
-							var.tupleof[i] = getSerializer!(T, fieldName).readValue!(typeof(f))(this, def.tupleof[i]);
+							var.tupleof[i] = getRepresentation!(T, fieldName).readValue!(typeof(f))(this, def.tupleof[i]);
 							break structSwitch;
 						}
 					}

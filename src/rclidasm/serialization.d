@@ -17,7 +17,7 @@ import rclidasm.clifile;
 import rclidasm.common;
 import rclidasm.disassembler;
 
-struct DefaultSerializer
+struct DefaultRepresentation
 {
 	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
 		if (is(typeof(field) == typeof(def)))
@@ -31,7 +31,7 @@ struct DefaultSerializer
 	}
 }
 
-struct HexIntegerSerializer
+struct HexIntegerRepresentation
 {
 	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
 		if (is(typeof(field) == typeof(def)))
@@ -47,7 +47,7 @@ struct HexIntegerSerializer
 }
 
 /// For zero-terminated strings in fixed-length arrays.
-struct CStrArrSerializer
+struct CStrArrRepresentation
 {
 	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
 		if (is(typeof(field) == typeof(def)))
@@ -70,7 +70,7 @@ struct CStrArrSerializer
 }
 
 /// Constants which are not declared as an actual enum.
-struct ImplicitEnumSerializer(members...)
+struct ImplicitEnumRepresentation(members...)
 {
 	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
 		if (is(typeof(field) == typeof(def)))
@@ -115,7 +115,7 @@ struct ImplicitEnumSerializer(members...)
 /// An array which might as well be a struct with all fields of the same type.
 /// Note: the array length is not represented (because entries with
 /// default values are omitted), and must be fixed or specified elsewhere.
-struct SparseNamedIndexedArraySerializer(members...)
+struct SparseNamedIndexedArrayRepresentation(members...)
 {
 	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
 		if (is(typeof(field) == typeof(def)))
@@ -172,7 +172,7 @@ struct SparseNamedIndexedArraySerializer(members...)
 }
 
 /// Bitmask using constants which are not declared as an actual enum.
-struct ImplicitEnumBitmaskSerializer(members...)
+struct ImplicitEnumBitmaskRepresentation(members...)
 {
 	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
 		if (is(typeof(field) == typeof(def)))
@@ -218,8 +218,8 @@ struct ImplicitEnumBitmaskSerializer(members...)
 	}
 }
 
-/// Unix timestamp serializer.
-struct UnixTimestampSerializer
+/// Unix timestamp Representation.
+struct UnixTimestampRepresentation
 {
 	enum timeFormat = "Y-m-d H:i:s";
 
@@ -240,9 +240,9 @@ struct UnixTimestampSerializer
 	}
 }
 
-/// Serializer for unions. fieldIndex indicates the index of the union
+/// Representation for unions. fieldIndex indicates the index of the union
 /// field we will be looking at.
-struct UnionSerializer(uint fieldIndex)
+struct UnionRepresentation(uint fieldIndex)
 {
 	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
 		if (is(typeof(field) == typeof(def)))
@@ -253,7 +253,7 @@ struct UnionSerializer(uint fieldIndex)
 			{
 				enum name = __traits(identifier, field.tupleof[i]);
 				d.writer.beginTag(name);
-				getSerializer!(F, name).putValue(d, f, def.tupleof[i]);
+				getRepresentation!(F, name).putValue(d, f, def.tupleof[i]);
 				d.writer.endTag();
 			}
 		d.writer.endStruct();
@@ -274,16 +274,16 @@ struct UnionSerializer(uint fieldIndex)
 	}
 }
 
-auto getSerializer(T, string name)()
+auto getRepresentation(T, string name)()
 {
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "TimeDateStamp")
-		return UnixTimestampSerializer();
+		return UnixTimestampRepresentation();
 	else
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "SizeOfOptionalHeader")
-		return HexIntegerSerializer();
+		return HexIntegerRepresentation();
 	else
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "Characteristics")
-		return ImplicitEnumBitmaskSerializer!(
+		return ImplicitEnumBitmaskRepresentation!(
 			IMAGE_FILE_RELOCS_STRIPPED,
 			IMAGE_FILE_EXECUTABLE_IMAGE,
 			IMAGE_FILE_LINE_NUMS_STRIPPED,
@@ -303,10 +303,10 @@ auto getSerializer(T, string name)()
 	else
 	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name.isOneOf("SizeOfCode", "SizeOfInitializedData",
 			"AddressOfEntryPoint", "BaseOfCode", "BaseOfData", "ImageBase", "SectionAlignment", "SizeOfImage", "SizeOfHeaders"))
-		return HexIntegerSerializer();
+		return HexIntegerRepresentation();
 	else
 	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name == "Subsystem")
-		return ImplicitEnumSerializer!(
+		return ImplicitEnumRepresentation!(
 			IMAGE_SUBSYSTEM_UNKNOWN,
 			IMAGE_SUBSYSTEM_NATIVE,
 			IMAGE_SUBSYSTEM_WINDOWS_GUI,
@@ -324,7 +324,7 @@ auto getSerializer(T, string name)()
 		)();
 	else
 	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name == "DllCharacteristics")
-		return ImplicitEnumBitmaskSerializer!(
+		return ImplicitEnumBitmaskRepresentation!(
 			IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE,
 			IMAGE_DLL_CHARACTERISTICS_FORCE_INTEGRITY,
 			IMAGE_DLL_CHARACTERISTICS_NX_COMPAT,
@@ -336,7 +336,7 @@ auto getSerializer(T, string name)()
 		)();
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Characteristics")
-		return ImplicitEnumBitmaskSerializer!(
+		return ImplicitEnumBitmaskRepresentation!(
 			IMAGE_SCN_TYPE_REG,
 			IMAGE_SCN_TYPE_DSECT,
 			IMAGE_SCN_TYPE_NOLOAD,
@@ -388,19 +388,19 @@ auto getSerializer(T, string name)()
 		)();
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Name")
-		return CStrArrSerializer();
+		return CStrArrRepresentation();
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name.isOneOf("VirtualAddress", "SizeOfRawData", "PointerToRawData"))
-		return HexIntegerSerializer();
+		return HexIntegerRepresentation();
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Misc")
-		return UnionSerializer!1(); // VirtualSize
+		return UnionRepresentation!1(); // VirtualSize
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER._Misc) && name == "VirtualSize")
-		return HexIntegerSerializer();
+		return HexIntegerRepresentation();
 	else
 	static if (is(Unqual!T == CLIFile.Header) && name == "dataDirectories")
-		return SparseNamedIndexedArraySerializer!(
+		return SparseNamedIndexedArrayRepresentation!(
 			IMAGE_DIRECTORY_ENTRY_EXPORT,
 			IMAGE_DIRECTORY_ENTRY_IMPORT,
 			IMAGE_DIRECTORY_ENTRY_RESOURCE,
@@ -419,10 +419,10 @@ auto getSerializer(T, string name)()
 		)();
 	else
 	static if (is(Unqual!T == IMAGE_DATA_DIRECTORY) && name.isOneOf("VirtualAddress", "Size"))
-		return HexIntegerSerializer();
+		return HexIntegerRepresentation();
 	else
 	static if (is(Unqual!T == CLIFile.UnaccountedBlock) && name == "offset")
-		return HexIntegerSerializer();
+		return HexIntegerRepresentation();
 	else
-		return DefaultSerializer();
+		return DefaultRepresentation();
 }
