@@ -15,6 +15,7 @@ mixin(importWin32!(q{winnt}));
 import assembler;
 import clifile;
 import common;
+import disassembler;
 
 struct DefaultSerializer
 {
