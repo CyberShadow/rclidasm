@@ -1,10 +1,10 @@
-module writer;
+module rclidasm.writer;
 
 import std.base64;
 import std.range;
 import std.string;
 
-import common;
+import rclidasm.common;
 
 struct Writer
 {

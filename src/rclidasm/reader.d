@@ -1,9 +1,9 @@
-module reader;
+module rclidasm.reader;
 
 import std.exception;
 import std.string;
 
-import tokenizer;
+import rclidasm.tokenizer;
 
 /// SDLang parser (on top of tokenizer).
 struct Reader

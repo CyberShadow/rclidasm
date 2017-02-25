@@ -1,4 +1,4 @@
-module serialization;
+module rclidasm.serialization;
 
 import std.conv;
 import std.datetime;
@@ -12,10 +12,10 @@ import ae.utils.time.parse;
 
 mixin(importWin32!(q{winnt}));
 
-import assembler;
-import clifile;
-import common;
-import disassembler;
+import rclidasm.assembler;
+import rclidasm.clifile;
+import rclidasm.common;
+import rclidasm.disassembler;
 
 struct DefaultSerializer
 {

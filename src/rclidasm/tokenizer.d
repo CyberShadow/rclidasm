@@ -1,8 +1,8 @@
-module tokenizer;
+module rclidasm.tokenizer;
 
 import std.exception;
 
-import common;
+import rclidasm.common;
 
 /// SDLang tokenizer.
 struct Tokenizer

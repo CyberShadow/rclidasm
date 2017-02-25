@@ -1,12 +1,12 @@
-module disassembler;
+module rclidasm.disassembler;
 
 import std.conv;
 import std.traits;
 
-import common;
-import clifile;
-import serialization;
-import writer;
+import rclidasm.common;
+import rclidasm.clifile;
+import rclidasm.serialization;
+import rclidasm.writer;
 
 struct Disassembler
 {

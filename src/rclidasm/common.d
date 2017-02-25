@@ -1,4 +1,4 @@
-module common;
+module rclidasm.common;
 
 import std.ascii;
 import std.traits;

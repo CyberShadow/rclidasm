@@ -1,4 +1,4 @@
-module clifile;
+module rclidasm.clifile;
 
 import std.exception;
 
