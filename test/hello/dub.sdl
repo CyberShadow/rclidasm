@@ -1,0 +1,10 @@
+name "test"
+description "Hello World test / example"
+authors "Vladimir Panteleev <vladimir@thecybershadow.net>"
+homepage "https://github.com/CyberShadow/rclidasm"
+license "GPL-3.0"
+
+targetType "executable"
+sourceFiles "test.d"
+
+dependency "rclidasm:lib" version="*" path="../.."

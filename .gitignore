@@ -1,4 +1,4 @@
 .dub/
-/dub.selections.json
 /rclidasm
 /src/main
+dub.selections.json

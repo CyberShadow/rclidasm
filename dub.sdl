@@ -16,7 +16,7 @@ dependency "rclidasm:lib" version="*"
 subPackage {
 	name "lib"
 	targetType "sourceLibrary"
-	sourceDir "src/rclidasm/"
+	sourcePaths "src/rclidasm/"
 	dependency "ae" version="==0.0.1890"
 	dependency "ae:windows" version="==0.0.1890"
 	dependency "bindings:win32-types" version="*" path="thirdparty/win32"
