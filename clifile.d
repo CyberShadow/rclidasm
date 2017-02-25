@@ -1019,21 +1019,3 @@ private:
 		return false;
 	}
 }
-
-void main()
-{
-	import std.file;
-	auto exe = cast(ubyte[])read("test.exe");
-	auto cli = CLIFile(exe);
-	auto disassembler = Disassembler(&cli);
-	auto disassembly = disassembler.disassemble();
-	write("test.rcli", disassembly);
-	auto assembler = Assembler(disassembly);
-	auto cli2 = assembler.assemble();
-	auto exe2 = cli2.compile();
-	write("test2.exe", exe2);
-	auto cli3 = CLIFile(exe2);
-	auto disassembler2 = Disassembler(&cli3);
-	auto disassembly2 = disassembler2.disassemble();
-	write("test2.rcli", disassembly2);
-}
