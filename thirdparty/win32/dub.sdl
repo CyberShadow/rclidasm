@@ -1,0 +1,31 @@
+# This is a dub.sdl file for the D bindings package (which is
+# registered as a submodule), to allow using them with dub.
+
+name "bindings"
+description "API Bindings for D"
+authors "Stewart Gordon and contributors"
+homepage "https://github.com/smjgordon/bindings"
+license "Public Domain"
+
+---------------------------
+
+# Just type definitions
+
+subPackage {
+	name "win32-types"
+	targetType "sourceLibrary"
+	sourceFiles \
+		"bindings/win32/winnt.d"
+}
+
+---------------------------
+
+# All modules
+
+subPackage {
+	name "win32"
+	targetType "sourceLibrary"
+	sourcePaths "bindings/win32/"
+	importPaths "bindings/win32/"
+	excludedSourceFiles "bindings/win32/winsock.d" # Superseded by winsock2.d
+}

@@ -1,0 +1,3 @@
+[submodule "thirdparty/win32/bindings"]
+	path = thirdparty/win32/bindings
+	url = https://github.com/smjgordon/bindings
