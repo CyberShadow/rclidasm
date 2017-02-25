@@ -17,273 +17,44 @@ import rclidasm.clifile;
 import rclidasm.common;
 import rclidasm.disassembler;
 
-struct DefaultRepresentation
-{
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		d.putVar!(typeof(field))(field, def);
-	}
+struct DefaultRepresentation {}
 
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		return a.readVar!T(def);
-	}
-}
-
-struct HexIntegerRepresentation
-{
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		static assert(is(F : long));
-		d.writer.putValue("0x%X".format(field));
-	}
-
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		return a.readVar!T(def);
-	}
-}
+struct HexIntegerRepresentation {}
 
 /// For zero-terminated strings in fixed-length arrays.
-struct CStrArrRepresentation
-{
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		auto arr = field[];
-		while (arr.length && arr[$-1] == def[arr.length-1])
-			arr = arr[0..$-1];
-		d.writer.putString(cast(char[])arr);
-	}
-
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		auto s = a.reader.readString();
-		T result = def;
-		enforce(s.length <= result.length, "String too long");
-		foreach (i, c; s)
-			result[i] = c;
-		return result;
-	}
-}
+struct CStrArrRepresentation {}
 
 /// Constants which are not declared as an actual enum.
-struct ImplicitEnumRepresentation(members...)
-{
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		static assert(is(F : long));
-		switch (field)
-		{
-			foreach (i, member; members)
-			{
-				case member:
-					d.writer.putValue(__traits(identifier, members[i]));
-					return;
-			}
-			default:
-				d.writer.putValue("%d".format(field));
-		}
-	}
-
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		auto word = a.reader.readWord();
-		a.reader.endNode();
-
-		if (word[0].isDigit())
-			return parseIntLiteral!T(word);
-		else
-		{
-			switch (word)
-			{
-				foreach (i, member; members)
-				{
-					case __traits(identifier, members[i]):
-						return member;
-				}
-				default:
-					throw new Exception("Unknown bitmask value: %s", word);
-			}
-		}
-	}
-}
+struct ImplicitEnumRepresentation(members...) {}
 
 /// An array which might as well be a struct with all fields of the same type.
 /// Note: the array length is not represented (because entries with
 /// default values are omitted), and must be fixed or specified elsewhere.
-struct SparseNamedIndexedArrayRepresentation(members...)
-{
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		d.writer.beginStruct();
-		foreach (i, ref a; field)
-		{
-			auto aDef = i < def.length ? def[i] : typeof(a).init;
-			if (a == aDef)
-				continue;
-		memberSwitch:
-			switch (i)
-			{
-				foreach (memberIndex, member; members)
-				{
-					case member:
-						d.writer.beginTag(__traits(identifier, members[memberIndex]));
-						break memberSwitch;
-				}
-				default:
-					d.writer.beginTag(text(i));
-			}
-			d.putVar!(typeof(a))(a, aDef);
-			d.writer.endTag();
-		}
-		d.writer.endStruct();
-	}
-
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		a.reader.beginStruct();
-		T result = def.clone();
-		alias E = typeof(result[0]);
-		while (!a.reader.skipEndStruct())
-		{
-			auto tag = a.reader.readTag();
-		memberSwitch:
-			switch (tag)
-			{
-				foreach (i, member; members)
-				{
-					enum name = __traits(identifier, members[i]);
-					case name:
-						enforce(result.length > member, "%s array too small to fit member %s".format(T.stringof, name));
-						result[member] = a.readVar!E(member < def.length ? def[member] : initOf!E);
-						break memberSwitch;
-				}
-				default:
-					throw new Exception("Unknown array index constant: %s", tag);
-			}
-		}
-		return result;
-	}
-}
+struct SparseNamedIndexedArrayRepresentation(members...) {}
 
 /// Bitmask using constants which are not declared as an actual enum.
-struct ImplicitEnumBitmaskRepresentation(members...)
-{
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		static assert(is(F : long));
-		Unqual!F remainingBits = field;
-		foreach (i, member; members)
-			if ((remainingBits & member) == member)
-			{
-				d.writer.putValue(__traits(identifier, members[i]));
-				remainingBits &= ~member;
-			}
-		for (Unqual!F mask = 1; mask; mask <<= 1)
-			if (remainingBits & mask)
-				d.writer.putValue("0x%x".format(mask));
-	}
-
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		T result;
-		while (!a.reader.skipEndNode())
-		{
-			auto word = a.reader.readWord();
-			if (word[0].isDigit())
-				result |= parseIntLiteral!T(word);
-			else
-			{
-			memberSwitch:
-				switch (word)
-				{
-					foreach (i, member; members)
-					{
-						case __traits(identifier, members[i]):
-							result |= member;
-							break memberSwitch;
-					}
-					default:
-						throw new Exception("Unknown bitmask value: %s".format(word));
-				}
-			}
-		}
-		return result;
-	}
-}
+struct ImplicitEnumBitmaskRepresentation(members...) {}
 
 /// Unix timestamp Representation.
 struct UnixTimestampRepresentation
 {
 	enum timeFormat = "Y-m-d H:i:s";
-
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		static assert(is(F : long));
-		SysTime time = SysTime.fromUnixTime(field);
-		d.writer.putValue(time.formatTime!timeFormat);
-	}
-
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		auto dateStr = a.reader.readWord();
-		auto timeStr = a.reader.readWord();
-		a.reader.endNode();
-		return (dateStr ~ " " ~ timeStr).parseTime!timeFormat.toUnixTime.to!T();
-	}
 }
 
 /// Representation for unions. fieldIndex indicates the index of the union
 /// field we will be looking at.
-struct UnionRepresentation(uint fieldIndex)
-{
-	void putValue(F, D)(ref Disassembler d, in ref F field, in ref D def)
-		if (is(typeof(field) == typeof(def)))
-	{
-		d.writer.beginStruct();
-		foreach (i, ref f; field.tupleof)
-			static if (i == fieldIndex)
-			{
-				enum name = __traits(identifier, field.tupleof[i]);
-				d.writer.beginTag(name);
-				getRepresentation!(F, name).putValue(d, f, def.tupleof[i]);
-				d.writer.endTag();
-			}
-		d.writer.endStruct();
-	}
+struct UnionRepresentation(uint fieldIndex) {}
 
-	T readValue(T)(ref Assembler a, in ref T def)
-	{
-		a.reader.beginStruct();
-		T result;
-		foreach (i, ref f; result.tupleof)
-			static if (i == fieldIndex)
-			{
-				a.reader.expectTag(__traits(identifier, result.tupleof[i]));
-				f = a.readVar!(typeof(f))(def.tupleof[i]);
-			}
-		a.reader.endStruct();
-		return result;
-	}
-}
-
-auto getRepresentation(T, string name)()
+template RepresentationOf(T, string name)
 {
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "TimeDateStamp")
-		return UnixTimestampRepresentation();
+		alias RepresentationOf = UnixTimestampRepresentation;
 	else
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "SizeOfOptionalHeader")
-		return HexIntegerRepresentation();
+		alias RepresentationOf = HexIntegerRepresentation;
 	else
 	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "Characteristics")
-		return ImplicitEnumBitmaskRepresentation!(
+		alias RepresentationOf = ImplicitEnumBitmaskRepresentation!(
 			IMAGE_FILE_RELOCS_STRIPPED,
 			IMAGE_FILE_EXECUTABLE_IMAGE,
 			IMAGE_FILE_LINE_NUMS_STRIPPED,
@@ -299,14 +70,14 @@ auto getRepresentation(T, string name)()
 			IMAGE_FILE_DLL,
 			IMAGE_FILE_UP_SYSTEM_ONLY,
 			IMAGE_FILE_BYTES_REVERSED_HI,
-		)();
+		);
 	else
 	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name.isOneOf("SizeOfCode", "SizeOfInitializedData",
 			"AddressOfEntryPoint", "BaseOfCode", "BaseOfData", "ImageBase", "SectionAlignment", "SizeOfImage", "SizeOfHeaders"))
-		return HexIntegerRepresentation();
+		alias RepresentationOf = HexIntegerRepresentation;
 	else
 	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name == "Subsystem")
-		return ImplicitEnumRepresentation!(
+		alias RepresentationOf = ImplicitEnumRepresentation!(
 			IMAGE_SUBSYSTEM_UNKNOWN,
 			IMAGE_SUBSYSTEM_NATIVE,
 			IMAGE_SUBSYSTEM_WINDOWS_GUI,
@@ -321,10 +92,10 @@ auto getRepresentation(T, string name)()
 			IMAGE_SUBSYSTEM_EFI_ROM,
 			IMAGE_SUBSYSTEM_XBOX,
 			IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION,
-		)();
+		);
 	else
 	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name == "DllCharacteristics")
-		return ImplicitEnumBitmaskRepresentation!(
+		alias RepresentationOf = ImplicitEnumBitmaskRepresentation!(
 			IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE,
 			IMAGE_DLL_CHARACTERISTICS_FORCE_INTEGRITY,
 			IMAGE_DLL_CHARACTERISTICS_NX_COMPAT,
@@ -333,10 +104,10 @@ auto getRepresentation(T, string name)()
 			IMAGE_DLLCHARACTERISTICS_NO_BIND,
 			IMAGE_DLLCHARACTERISTICS_WDM_DRIVER,
 			IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
-		)();
+		);
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Characteristics")
-		return ImplicitEnumBitmaskRepresentation!(
+		alias RepresentationOf = ImplicitEnumBitmaskRepresentation!(
 			IMAGE_SCN_TYPE_REG,
 			IMAGE_SCN_TYPE_DSECT,
 			IMAGE_SCN_TYPE_NOLOAD,
@@ -385,22 +156,22 @@ auto getRepresentation(T, string name)()
 			IMAGE_SCN_ALIGN_2BYTES,           // 0x00200000
 			IMAGE_SCN_ALIGN_8BYTES,           // 0x00400000
 			IMAGE_SCN_ALIGN_128BYTES,         // 0x00800000
-		)();
+		);
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Name")
-		return CStrArrRepresentation();
+		alias RepresentationOf = CStrArrRepresentation;
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name.isOneOf("VirtualAddress", "SizeOfRawData", "PointerToRawData"))
-		return HexIntegerRepresentation();
+		alias RepresentationOf = HexIntegerRepresentation;
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Misc")
-		return UnionRepresentation!1(); // VirtualSize
+		alias RepresentationOf = UnionRepresentation!1; // VirtualSize
 	else
 	static if (is(Unqual!T == IMAGE_SECTION_HEADER._Misc) && name == "VirtualSize")
-		return HexIntegerRepresentation();
+		alias RepresentationOf = HexIntegerRepresentation;
 	else
 	static if (is(Unqual!T == CLIFile.Header) && name == "dataDirectories")
-		return SparseNamedIndexedArrayRepresentation!(
+		alias RepresentationOf = SparseNamedIndexedArrayRepresentation!(
 			IMAGE_DIRECTORY_ENTRY_EXPORT,
 			IMAGE_DIRECTORY_ENTRY_IMPORT,
 			IMAGE_DIRECTORY_ENTRY_RESOURCE,
@@ -416,13 +187,13 @@ auto getRepresentation(T, string name)()
 			IMAGE_DIRECTORY_ENTRY_IAT,
 			IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT,
 			IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR,
-		)();
+		);
 	else
 	static if (is(Unqual!T == IMAGE_DATA_DIRECTORY) && name.isOneOf("VirtualAddress", "Size"))
-		return HexIntegerRepresentation();
+		alias RepresentationOf = HexIntegerRepresentation;
 	else
 	static if (is(Unqual!T == CLIFile.UnaccountedBlock) && name == "offset")
-		return HexIntegerRepresentation();
+		alias RepresentationOf = HexIntegerRepresentation;
 	else
-		return DefaultRepresentation();
+		alias RepresentationOf = DefaultRepresentation;
 }

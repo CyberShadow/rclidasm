@@ -1,6 +1,9 @@
 module rclidasm.assembler;
 
+import ae.utils.time.parse;
+
 import std.algorithm.searching;
+import std.ascii;
 import std.base64;
 import std.conv;
 import std.exception;
@@ -44,95 +47,212 @@ struct Assembler
 	}
 
 private:
-	public/*!*/ Reader reader;
+	Reader reader;
 
-	T readVar(T)(in ref T def = initOf!T)
+	T readVar(T, Representation = DefaultRepresentation)(in ref T def = initOf!T)
 	{
-		static if (is(T == struct))
+		static if (is(Representation == DefaultRepresentation))
 		{
-			reader.beginStruct();
-			T var = def.clone();
-			while (!reader.skipEndStruct())
+			static if (is(T == struct))
 			{
-				auto name = reader.readTag();
-			structSwitch:
-				switch (name)
+				reader.beginStruct();
+				T var = def.clone();
+				while (!reader.skipEndStruct())
 				{
-					foreach (i, ref f; var.tupleof)
+					auto name = reader.readTag();
+				structSwitch:
+					switch (name)
 					{
-						enum fieldName = __traits(identifier, var.tupleof[i]);
-						case fieldName:
+						foreach (i, ref f; var.tupleof)
 						{
-							static assert(is(typeof(f = f)), typeof(f).stringof);
-							var.tupleof[i] = getRepresentation!(T, fieldName).readValue!(typeof(f))(this, def.tupleof[i]);
-							break structSwitch;
+							enum fieldName = __traits(identifier, var.tupleof[i]);
+							case fieldName:
+							{
+								static assert(is(typeof(f = f)), typeof(f).stringof);
+								var.tupleof[i] = readVar!(typeof(f), RepresentationOf!(T, fieldName))(def.tupleof[i]);
+								break structSwitch;
+							}
 						}
+						default:
+							throw new Exception("Unknown %s field: %s".format(T.stringof, name));
+					}
+				}
+				reader.endNode();
+				return var;
+			}
+			else
+			static if (is(T == union))
+			{
+				static assert(false, "Can't unserialize a union: " ~ T.stringof);
+			}
+			else
+			static if (is(T : ulong))
+			{
+				auto value = reader.readWord().parseIntLiteral!T();
+				reader.endNode();
+				return value;
+			}
+			else
+			static if (is(T == string))
+			{
+				auto value = reader.readString();
+				reader.endNode();
+				return value;
+			}
+			else
+			static if (is(T : const(ubyte)[]))
+			{
+				reader.beginData();
+				T result;
+				while (!reader.skipEndData())
+					result ~= Base64.decode(reader.readData());
+				reader.endNode();
+				return result;
+			}
+			else
+			static if (is(T : A[n], A, size_t n))
+			{
+				reader.beginStruct();
+				T result;
+				foreach (i, ref f; result)
+				{
+					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
+					f = readVar!A(def[i]);
+				}
+				reader.endStruct();
+				reader.endNode();
+				return result;
+			}
+			else
+			static if (is(T A : A[]))
+			{
+				reader.beginStruct();
+				T result;
+				while (!reader.skipEndStruct())
+				{
+					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
+					const A aDef = result.length < def.length ? def[result.length] : A.init;
+					result ~= readVar!A(aDef);
+				}
+				reader.endNode();
+				return result;
+			}
+			else
+				static assert(false, "Don't know how to put " ~ T.stringof);
+		}
+		else
+		static if (is(Representation == HexIntegerRepresentation))
+		{
+			return readVar!T(def);
+		}
+		else
+		static if (is(Representation == CStrArrRepresentation))
+		{
+			auto s = reader.readString();
+			T result = def;
+			enforce(s.length <= result.length, "String too long");
+			foreach (i, c; s)
+				result[i] = c;
+			return result;
+		}
+		else
+		static if (is(Representation == ImplicitEnumRepresentation!members, members...))
+		{
+			auto word = reader.readWord();
+			reader.endNode();
+
+			if (word[0].isDigit())
+				return parseIntLiteral!T(word);
+			else
+			{
+				switch (word)
+				{
+					foreach (i, member; members)
+					{
+						case __traits(identifier, members[i]):
+							return member;
 					}
 					default:
-						throw new Exception("Unknown %s field: %s".format(T.stringof, name));
+						throw new Exception("Unknown bitmask value: %s", word);
 				}
 			}
-			reader.endNode();
-			return var;
 		}
 		else
-		static if (is(T == union))
-		{
-			static assert(false, "Can't unserialize a union: " ~ T.stringof);
-		}
-		else
-		static if (is(T : ulong))
-		{
-			auto value = reader.readWord().parseIntLiteral!T();
-			reader.endNode();
-			return value;
-		}
-		else
-		static if (is(T == string))
-		{
-			auto value = reader.readString();
-			reader.endNode();
-			return value;
-		}
-		else
-		static if (is(T : const(ubyte)[]))
-		{
-			reader.beginData();
-			T result;
-			while (!reader.skipEndData())
-				result ~= Base64.decode(reader.readData());
-			reader.endNode();
-			return result;
-		}
-		else
-		static if (is(T : A[n], A, size_t n))
+		static if (is(Representation == SparseNamedIndexedArrayRepresentation!members, members...))
 		{
 			reader.beginStruct();
-			T result;
-			foreach (i, ref f; result)
-			{
-				enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
-				f = readVar!A(def[i]);
-			}
-			reader.endStruct();
-			reader.endNode();
-			return result;
-		}
-		else
-		static if (is(T A : A[]))
-		{
-			reader.beginStruct();
-			T result;
+			T result = def.clone();
+			alias E = typeof(result[0]);
 			while (!reader.skipEndStruct())
 			{
-				enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
-				const A aDef = result.length < def.length ? def[result.length] : A.init;
-				result ~= readVar!A(aDef);
+				auto tag = reader.readTag();
+			memberSwitch:
+				switch (tag)
+				{
+					foreach (i, member; members)
+					{
+						enum name = __traits(identifier, members[i]);
+						case name:
+							enforce(result.length > member, "%s array too small to fit member %s".format(T.stringof, name));
+							result[member] = readVar!E(member < def.length ? def[member] : initOf!E);
+							break memberSwitch;
+					}
+					default:
+						throw new Exception("Unknown array index constant: %s", tag);
+				}
 			}
-			reader.endNode();
 			return result;
 		}
 		else
-			static assert(false, "Don't know how to put " ~ T.stringof);
+		static if (is(Representation == ImplicitEnumBitmaskRepresentation!members, members...))
+		{
+			T result;
+			while (!reader.skipEndNode())
+			{
+				auto word = reader.readWord();
+				if (word[0].isDigit())
+					result |= parseIntLiteral!T(word);
+				else
+				{
+				memberSwitch:
+					switch (word)
+					{
+						foreach (i, member; members)
+						{
+							case __traits(identifier, members[i]):
+								result |= member;
+								break memberSwitch;
+						}
+						default:
+							throw new Exception("Unknown bitmask value: %s".format(word));
+					}
+				}
+			}
+			return result;
+		}
+		else
+		static if (is(Representation == UnixTimestampRepresentation))
+		{
+			auto dateStr = reader.readWord();
+			auto timeStr = reader.readWord();
+			reader.endNode();
+			return (dateStr ~ " " ~ timeStr).parseTime!(UnixTimestampRepresentation.timeFormat).toUnixTime.to!T();
+		}
+		else
+		static if (is(Representation == UnionRepresentation!fieldIndex, uint fieldIndex))
+		{
+			reader.beginStruct();
+			T result;
+			foreach (i, ref f; result.tupleof)
+				static if (i == fieldIndex)
+				{
+					reader.expectTag(__traits(identifier, result.tupleof[i]));
+					f = readVar!(typeof(f))(def.tupleof[i]);
+				}
+			reader.endStruct();
+			return result;
+		}
+		else
+			static assert(false, "Unknown representation: " ~ Representation.stringof);
 	}
 }
