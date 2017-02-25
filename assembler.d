@@ -1,6 +1,8 @@
 module assembler;
 
+import std.algorithm.searching;
 import std.base64;
+import std.conv;
 import std.exception;
 import std.string;
 import std.traits;
@@ -9,6 +11,17 @@ import clifile;
 import common;
 import reader;
 import serialization;
+
+T parseIntLiteral(T)(string s)
+{
+	if (s.skipOver("0x"))
+		return s.to!T(16);
+	else
+	if (s.skipOver("0b"))
+		return s.to!T(2);
+	else
+		return s.to!T();
+}
 
 struct Assembler
 {

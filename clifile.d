@@ -72,34 +72,6 @@ immutable IMAGE_NT_HEADERS32 cliPEHeader =
 
 import ae.sys.windows.pe.pe;
 
-auto clone(T)(ref T var)
-{
-	static if (!hasIndirections!T)
-	{
-		Unqual!T result = var;
-		return result;
-	}
-	else
-	static if (is(T == struct))
-	{
-		Unqual!T result;
-		foreach (i, ref f; var.tupleof)
-			result.tupleof[i] = var.tupleof[i].clone();
-		return result;
-	}
-	else
-	static if (isDynamicArray!T)
-	{
-		alias E = Unqual!(typeof(var[0]));
-		E[] result = new E[var.length];
-		foreach (i, ref f; var)
-			result[i] = f.clone();
-		return result;
-	}
-	else
-		static assert(false, "Don't know how to clone " ~ T.stringof);
-}
-
 struct CLIFile
 {
 	size_t size;
@@ -211,15 +183,4 @@ struct CLIFile
 
 		return result;
 	}
-}
-
-T parseIntLiteral(T)(string s)
-{
-	if (s.skipOver("0x"))
-		return s.to!T(16);
-	else
-	if (s.skipOver("0b"))
-		return s.to!T(2);
-	else
-		return s.to!T();
 }
