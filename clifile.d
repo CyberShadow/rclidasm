@@ -1,24 +1,11 @@
 module clifile;
 
-import std.algorithm.searching;
-import std.ascii;
-import std.base64;
-import std.conv;
-import std.datetime;
 import std.exception;
-import std.range;
-import std.string;
-import std.traits;
 
 import ae.sys.windows.imports;
 import ae.utils.array;
 
 mixin(importWin32!(q{winnt}));
-
-import common;
-import disassembler;
-import serialization;
-import writer;
 
 immutable IMAGE_DOS_HEADER cliDosHeader =
 {
