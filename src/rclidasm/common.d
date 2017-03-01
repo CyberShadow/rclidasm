@@ -54,13 +54,17 @@ DeepUnqual!T clone(T)(ref T var)
 		return result;
 	}
 	else
-	static if (isDynamicArray!T)
+	static if (is(T E : E[]))
 	{
-		alias E = Unqual!(typeof(var[0]));
-		E[] result = new E[var.length];
-		foreach (i, ref f; var)
-			result[i] = f.clone();
-		return result;
+		static if (!hasIndirections!E)
+			return var.dup;
+		else
+		{
+			Unqual!E[] result = new Unqual!E[var.length];
+			foreach (i, ref f; var)
+				result[i] = f.clone();
+			return result;
+		}
 	}
 	else
 		static assert(false, "Don't know how to clone " ~ T.stringof);
