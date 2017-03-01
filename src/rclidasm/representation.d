@@ -63,6 +63,11 @@ struct UnixTimestampRepresentation
 /// field we will be looking at.
 struct UnionRepresentation(uint fieldIndex) {}
 
+struct PropMap(string name, alias toInclude, alias getter, alias setter) {}
+
+/// Serialized like a struct, but with getters/setters.
+struct PropMapRepresentation(PropMaps...) {}
+
 template RepresentationOf(P, F, string name)
 {
 	static if (is(Unqual!P == IMAGE_FILE_HEADER) && name == "TimeDateStamp")

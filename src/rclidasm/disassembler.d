@@ -195,6 +195,29 @@ private:
 			writer.endStruct();
 		}
 		else
+		static if (is(Representation == PropMapRepresentation!PropMaps, PropMaps...))
+		{
+			writer.beginStruct();
+			foreach (RPropMap; PropMaps)
+				static if (is(RPropMap == PropMap!(name, toInclude, getter, setter), string name, alias toInclude, alias getter, alias setter))
+				{
+					if (!toInclude(var))
+						continue;
+					alias F = typeof(getter(var));
+					auto f = getter(var);
+					auto d = getter(def);
+					if (f != d)
+					{
+						writer.beginTag(name);
+						putVar!(F, RepresentationOf!(T, F, name))(f, d);
+						writer.endTag();
+					}
+				}
+				else
+					static assert(false);
+			writer.endStruct();
+		}
+		else
 			static assert(false, "Unknown representation: " ~ Representation.stringof);
 	}
 }

@@ -289,6 +289,37 @@ private:
 			return result;
 		}
 		else
+		static if (is(Representation == PropMapRepresentation!PropMaps, PropMaps...))
+		{
+			reader.beginStruct();
+			T result = def.clone();
+			while (!reader.skipEndStruct())
+			{
+				auto tag = reader.readTag();
+			memberSwitch:
+				switch (tag)
+				{
+					foreach (RPropMap; PropMaps)
+						static if (is(RPropMap == PropMap!(name, toInclude, getter, setter), string name, alias toInclude, alias getter, alias setter))
+						{
+							alias F = typeof(clone(initOf!(typeof(getter(result)))));
+							case name:
+							{
+								auto d = getter(def);
+								auto value = readVar!F(d);
+								setter(result, value);
+								break memberSwitch;
+							}
+						}
+						else
+							static assert(false);
+					default:
+						throw new Exception("Unknown array index constant: %s", tag);
+				}
+			}
+			return result;
+		}
+		else
 			static assert(false, "Unknown representation: " ~ Representation.stringof);
 	}
 }
