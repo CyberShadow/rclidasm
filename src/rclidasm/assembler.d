@@ -129,6 +129,16 @@ private:
 				return result;
 			}
 			else
+			static if (is(const(T) == const(void[])))
+			{
+				reader.beginData();
+				T result;
+				while (!reader.skipEndData())
+					result ~= Base64.decode(reader.readData());
+				reader.endNode();
+				return result;
+			}
+			else
 			static if (is(T : A[n], A, size_t n))
 			{
 				reader.beginStruct();
