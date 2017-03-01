@@ -63,15 +63,15 @@ struct UnixTimestampRepresentation
 /// field we will be looking at.
 struct UnionRepresentation(uint fieldIndex) {}
 
-template RepresentationOf(T, string name)
+template RepresentationOf(P, string name)
 {
-	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "TimeDateStamp")
+	static if (is(Unqual!P == IMAGE_FILE_HEADER) && name == "TimeDateStamp")
 		alias RepresentationOf = UnixTimestampRepresentation;
 	else
-	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "SizeOfOptionalHeader")
+	static if (is(Unqual!P == IMAGE_FILE_HEADER) && name == "SizeOfOptionalHeader")
 		alias RepresentationOf = HexIntegerRepresentation;
 	else
-	static if (is(Unqual!T == IMAGE_FILE_HEADER) && name == "Characteristics")
+	static if (is(Unqual!P == IMAGE_FILE_HEADER) && name == "Characteristics")
 		alias RepresentationOf = ImplicitEnumBitmaskRepresentation!(
 			IMAGE_FILE_RELOCS_STRIPPED,
 			IMAGE_FILE_EXECUTABLE_IMAGE,
@@ -90,11 +90,11 @@ template RepresentationOf(T, string name)
 			IMAGE_FILE_BYTES_REVERSED_HI,
 		);
 	else
-	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name.isOneOf("SizeOfCode", "SizeOfInitializedData",
+	static if (is(Unqual!P == IMAGE_OPTIONAL_HEADER) && name.isOneOf("SizeOfCode", "SizeOfInitializedData",
 			"AddressOfEntryPoint", "BaseOfCode", "BaseOfData", "ImageBase", "SectionAlignment", "SizeOfImage", "SizeOfHeaders"))
 		alias RepresentationOf = HexIntegerRepresentation;
 	else
-	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name == "Subsystem")
+	static if (is(Unqual!P == IMAGE_OPTIONAL_HEADER) && name == "Subsystem")
 		alias RepresentationOf = ImplicitEnumRepresentation!(
 			IMAGE_SUBSYSTEM_UNKNOWN,
 			IMAGE_SUBSYSTEM_NATIVE,
@@ -112,7 +112,7 @@ template RepresentationOf(T, string name)
 			IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION,
 		);
 	else
-	static if (is(Unqual!T == IMAGE_OPTIONAL_HEADER) && name == "DllCharacteristics")
+	static if (is(Unqual!P == IMAGE_OPTIONAL_HEADER) && name == "DllCharacteristics")
 		alias RepresentationOf = ImplicitEnumBitmaskRepresentation!(
 			IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE,
 			IMAGE_DLL_CHARACTERISTICS_FORCE_INTEGRITY,
@@ -124,7 +124,7 @@ template RepresentationOf(T, string name)
 			IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
 		);
 	else
-	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Characteristics")
+	static if (is(Unqual!P == IMAGE_SECTION_HEADER) && name == "Characteristics")
 		alias RepresentationOf = ImplicitEnumBitmaskRepresentation!(
 			IMAGE_SCN_TYPE_REG,
 			IMAGE_SCN_TYPE_DSECT,
@@ -176,19 +176,19 @@ template RepresentationOf(T, string name)
 			IMAGE_SCN_ALIGN_128BYTES,         // 0x00800000
 		);
 	else
-	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Name")
+	static if (is(Unqual!P == IMAGE_SECTION_HEADER) && name == "Name")
 		alias RepresentationOf = CStrArrRepresentation;
 	else
-	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name.isOneOf("VirtualAddress", "SizeOfRawData", "PointerToRawData"))
+	static if (is(Unqual!P == IMAGE_SECTION_HEADER) && name.isOneOf("VirtualAddress", "SizeOfRawData", "PointerToRawData"))
 		alias RepresentationOf = HexIntegerRepresentation;
 	else
-	static if (is(Unqual!T == IMAGE_SECTION_HEADER) && name == "Misc")
+	static if (is(Unqual!P == IMAGE_SECTION_HEADER) && name == "Misc")
 		alias RepresentationOf = UnionRepresentation!1; // VirtualSize
 	else
-	static if (is(Unqual!T == IMAGE_SECTION_HEADER._Misc) && name == "VirtualSize")
+	static if (is(Unqual!P == IMAGE_SECTION_HEADER._Misc) && name == "VirtualSize")
 		alias RepresentationOf = HexIntegerRepresentation;
 	else
-	static if (is(Unqual!T == CLIFile.Header) && name == "dataDirectories")
+	static if (is(Unqual!P == CLIFile.Header) && name == "dataDirectories")
 		alias RepresentationOf = SparseNamedIndexedArrayRepresentation!(
 			IMAGE_DIRECTORY_ENTRY_EXPORT,
 			IMAGE_DIRECTORY_ENTRY_IMPORT,
@@ -207,10 +207,10 @@ template RepresentationOf(T, string name)
 			IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR,
 		);
 	else
-	static if (is(Unqual!T == IMAGE_DATA_DIRECTORY) && name.isOneOf("VirtualAddress", "Size"))
+	static if (is(Unqual!P == IMAGE_DATA_DIRECTORY) && name.isOneOf("VirtualAddress", "Size"))
 		alias RepresentationOf = HexIntegerRepresentation;
 	else
-	static if (is(Unqual!T == CLIFile.UnaccountedBlock) && name == "offset")
+	static if (is(Unqual!P == CLIFile.UnaccountedBlock) && name == "offset")
 		alias RepresentationOf = HexIntegerRepresentation;
 	else
 		alias RepresentationOf = DefaultRepresentation;
