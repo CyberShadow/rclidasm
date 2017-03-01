@@ -30,7 +30,15 @@ bool isTagChar(char c)
 
 static immutable initOf(T) = T.init;
 
-auto clone(T)(ref T var)
+private template DeepUnqual(T)
+{
+	static if (is(T A : A[]))
+		alias DeepUnqual = Unqual!A[];
+	else
+		alias DeepUnqual = Unqual!T;
+}
+
+DeepUnqual!T clone(T)(ref T var)
 {
 	static if (!hasIndirections!T)
 	{
