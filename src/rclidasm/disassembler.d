@@ -83,6 +83,9 @@ private:
 			static if (is(T : const(ubyte)[]))
 				writer.putData(var);
 			else
+			static if (is(const(T) == const(void[])))
+				writer.putData(cast(const(ubyte)[])var);
+			else
 			static if (is(T A : A[]))
 			{
 				writer.beginStruct();
