@@ -94,7 +94,7 @@ private:
 					writer.beginTag(Unqual!A.stringof);
 					auto aDef = i < def.length ? def[i] : A.init;
 					if (a != aDef)
-						putVar!A(a, aDef);
+						putVar!(A, RepresentationOf!(T, A, null))(a, aDef);
 					writer.endTag();
 				}
 				writer.endStruct();
