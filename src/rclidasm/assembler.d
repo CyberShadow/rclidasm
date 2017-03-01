@@ -119,6 +119,13 @@ private:
 				return value;
 			}
 			else
+			static if (is(T : const(wchar)[]))
+			{
+				auto value = reader.readString().to!T;
+				reader.endNode();
+				return value;
+			}
+			else
 			static if (is(T : const(ubyte)[]))
 			{
 				reader.beginData();
