@@ -153,7 +153,7 @@ private:
 				foreach (i, ref f; result)
 				{
 					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
-					f = readVar!A(def[i]);
+					f = readVar!(A, RepresentationOf!(T, A, null))(def[i]);
 				}
 				reader.endStruct();
 				reader.endNode();
@@ -168,7 +168,7 @@ private:
 				{
 					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
 					const A aDef = result.length < def.length ? def[result.length] : A.init;
-					result ~= readVar!A(aDef);
+					result ~= readVar!(A, RepresentationOf!(T, A, null))(aDef);
 				}
 				reader.endNode();
 				return result;
