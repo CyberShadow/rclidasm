@@ -59,7 +59,7 @@ private:
 
 					enum name = __traits(identifier, var.tupleof[i]);
 					writer.beginTag(name);
-					putVar!(typeof(f), RepresentationOf!(T, name))(f, def.tupleof[i]);
+					putVar!(typeof(f), RepresentationOf!(T, typeof(f), name))(f, def.tupleof[i]);
 					writer.endTag();
 				}
 				writer.endStruct();
@@ -186,7 +186,7 @@ private:
 				{
 					enum name = __traits(identifier, var.tupleof[i]);
 					writer.beginTag(name);
-					putVar!(typeof(f), RepresentationOf!(T, name))(f, def.tupleof[i]);
+					putVar!(typeof(f), RepresentationOf!(T, typeof(f), name))(f, def.tupleof[i]);
 					writer.endTag();
 				}
 			writer.endStruct();

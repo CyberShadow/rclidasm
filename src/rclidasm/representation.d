@@ -63,7 +63,7 @@ struct UnixTimestampRepresentation
 /// field we will be looking at.
 struct UnionRepresentation(uint fieldIndex) {}
 
-template RepresentationOf(P, string name)
+template RepresentationOf(P, F, string name)
 {
 	static if (is(Unqual!P == IMAGE_FILE_HEADER) && name == "TimeDateStamp")
 		alias RepresentationOf = UnixTimestampRepresentation;

@@ -83,11 +83,12 @@ private:
 					{
 						foreach (i, ref f; var.tupleof)
 						{
+							alias F = typeof(f);
 							enum fieldName = __traits(identifier, var.tupleof[i]);
 							case fieldName:
 							{
-								static assert(is(typeof(f = f)), typeof(f).stringof);
-								var.tupleof[i] = readVar!(typeof(f), RepresentationOf!(T, fieldName))(def.tupleof[i]);
+								static assert(is(typeof(f = f)), F.stringof);
+								var.tupleof[i] = readVar!(F, RepresentationOf!(T, F, fieldName))(def.tupleof[i]);
 								break structSwitch;
 							}
 						}
