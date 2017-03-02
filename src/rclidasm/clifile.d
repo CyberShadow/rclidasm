@@ -18,11 +18,14 @@
 
 module rclidasm.clifile;
 
+import std.conv;
 import std.exception;
 
 import ae.sys.windows.imports;
 import ae.sys.windows.pe.pe;
 import ae.utils.array;
+
+import rclidasm.resources;
 
 mixin(importWin32!(q{winnt}));
 
@@ -110,6 +113,7 @@ struct CLIFile
 		Fixup[] fixups;
 	}
 	Header header;
+	ResourceDirectory resources;
 
 	// Non-zero data in the PE file that doesn't seem to be referenced
 	// by anything.
@@ -145,7 +149,18 @@ struct CLIFile
 		byteUsed[cast(ubyte*)(pe.sectionHeaders.ptr                           ) - bytes.ptr ..
 		         cast(ubyte*)(pe.sectionHeaders.ptr + pe.sectionHeaders.length) - bytes.ptr] = true;
 
-		// ...
+		// Parse resources
+		if (header.dataDirectories[IMAGE_DIRECTORY_ENTRY_RESOURCE].Size)
+		{
+			auto resData = pe.directoryData(IMAGE_DIRECTORY_ENTRY_RESOURCE);
+			auto resAddr = resData.ptr - bytes.ptr;
+			assert(resAddr < bytes.length);
+			auto parser = ResourceParser(
+				resData,
+				byteUsed[resAddr .. resAddr + resData.length],
+				header.dataDirectories[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress);
+			resources = parser.parse();
+		}
 
 		// Record unaccounted data
 		for (size_t offset = 0; offset < bytes.length; offset++)
@@ -176,14 +191,30 @@ struct CLIFile
 		result.length = header.dosHeader.e_lfanew + header.ntHeaders.OptionalHeader.offsetof + header.ntHeaders.FileHeader.SizeOfOptionalHeader;
 		result ~= header.sections.bytes;
 
+		result.length = size;
+
+		size_t rvaToFile(size_t offset)
+		{
+			foreach (ref section; header.sections)
+				if (offset >= section.VirtualAddress && offset < section.VirtualAddress + section.SizeOfRawData)
+					return offset - section.VirtualAddress + section.PointerToRawData;
+			throw new Exception("Unmapped memory address");
+		}
+
+		if (header.dataDirectories[IMAGE_DIRECTORY_ENTRY_RESOURCE].Size)
+		{
+			auto resRVA = header.dataDirectories[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress;
+			auto resAddr = rvaToFile(resRVA).to!uint;
+			auto resData = ResourceCompiler(resources, resRVA).compile();
+			result[resAddr .. resAddr + resData.length] = resData;
+		}
+
 		foreach (block; unaccountedData)
 		{
 			if (result.length < block.offset + block.data.length)
 				result.length = block.offset + block.data.length;
 			result[block.offset .. block.offset+block.data.length] = block.data;
 		}
-
-		result.length = size;
 
 		return result;
 	}

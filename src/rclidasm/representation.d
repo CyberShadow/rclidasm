@@ -34,6 +34,7 @@ import rclidasm.assembler;
 import rclidasm.clifile;
 import rclidasm.common;
 import rclidasm.disassembler;
+import rclidasm.resources;
 
 struct DefaultRepresentation {}
 
@@ -217,6 +218,16 @@ template RepresentationOf(P, F, string name)
 	else
 	static if (is(Unqual!P == CLIFile.UnaccountedBlock) && name == "offset")
 		alias RepresentationOf = HexIntegerRepresentation;
+	else
+	static if (is(Unqual!F == ResourceDirectoryEntry))
+		alias RepresentationOf = PropMapRepresentation!(
+			PropMap!("Name"        , (in ref F f) =>  f.NameIsString   , (in ref F f) => f.Name        , (ref Unqual!F f,     WCHAR[]           value) { f.Name         = value; f.NameIsString    = true ; }),
+			PropMap!("NameOffset"  , (in ref F f) =>  f.NameIsString   , (in ref F f) => f.NameOffset  , (ref Unqual!F f,     DWORD             value) { f.NameOffset   = value; f.NameIsString    = true ; }),
+			PropMap!("Id"          , (in ref F f) => !f.NameIsString   , (in ref F f) => f.Id          , (ref Unqual!F f,     DWORD             value) { f.Id           = value; f.NameIsString    = false; }),
+			PropMap!("OffsetToData", (in ref F f) =>  true             , (in ref F f) => f.OffsetToData, (ref Unqual!F f,     DWORD             value) { f.OffsetToData = value;                            }),
+			PropMap!("directory"   , (in ref F f) =>  f.DataIsDirectory, (in ref F f) => f.directory   , (ref Unqual!F f, ref ResourceDirectory value) { f.directory    = value; f.DataIsDirectory = true ; }),
+			PropMap!("data"        , (in ref F f) => !f.DataIsDirectory, (in ref F f) => f.data        , (ref Unqual!F f, ref ResourceDataEntry value) { f.data         = value; f.DataIsDirectory = false; }),
+		);
 	else
 		alias RepresentationOf = DefaultRepresentation;
 }
