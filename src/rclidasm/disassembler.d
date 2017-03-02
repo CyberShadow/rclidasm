@@ -86,7 +86,7 @@ private:
 			static if (is(T U : U*))
 			{
 				if (var)
-					putVar!U(*var, def ? *def : initOf!U);
+					putVar!(U, RepresentationOf!(T, U, null))(*var, def ? *def : initOf!U);
 			}
 			else
 			static if (is(T : const(ubyte)[]))

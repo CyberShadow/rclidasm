@@ -128,7 +128,7 @@ private:
 					return null;
 				else
 				{
-					auto result = [readVar!U(def ? *def : initOf!U)].ptr;
+					auto result = [readVar!(U, RepresentationOf!(T, U, null))(def ? *def : initOf!U)].ptr;
 					// callee readVar will call endNode
 					return result;
 				}
