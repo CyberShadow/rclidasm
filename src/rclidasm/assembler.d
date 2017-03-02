@@ -105,6 +105,9 @@ private:
 				static assert(false, "Can't unserialize a union: " ~ T.stringof);
 			}
 			else
+			static if (is(T == bool))
+				return true;
+			else
 			static if (is(T : ulong))
 			{
 				auto value = reader.readWord().parseIntLiteral!T();

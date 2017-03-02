@@ -70,6 +70,9 @@ private:
 				static assert(false, "Can't serialize a union: " ~ T.stringof);
 			}
 			else
+			static if (is(T == bool))
+			{} // presence indicates 'true'
+			else
 			static if (is(T : ulong))
 			{
 				writer.putValue(text(var)); // TODO: Don't allocate
