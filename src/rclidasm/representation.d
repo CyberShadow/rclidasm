@@ -92,6 +92,9 @@ struct CStrArrRepresentation {}
 /// Constants which are not declared as an actual enum.
 struct ImplicitEnumRepresentation(members...) {}
 
+/// An actual enum.
+alias EnumRepresentation(Enum) = ImplicitEnumRepresentation!(EnumMembers!Enum);
+
 /// An array which might as well be a struct with all fields of the same type.
 /// Note: the array length is not represented (because entries with
 /// default values are omitted), and must be fixed or specified elsewhere.
@@ -291,7 +294,7 @@ template RepresentationOf(P, F, string name)
 		alias RepresentationOf = SelectRepresentation!(
 			(in F* f) => resourceStack.length > 1 ? 0 : 1,
 			DefaultRepresentation,
-			ImplicitEnumRepresentation!(EnumMembers!ResourceType),
+			EnumRepresentation!ResourceType,
 		);
 	else
 	static if (is(Unqual!F == ResourceDataEntry))
