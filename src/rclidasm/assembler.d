@@ -325,6 +325,20 @@ private:
 			return readVar!(T, NextRepresentation)(def);
 		}
 		else
+		static if (is(Representation == SelectRepresentation!(cond, Representations), alias cond, Representations...))
+		{
+			switch (cond(null))
+			{
+				foreach (i, Representation; Representations)
+				{
+					case i:
+						return readVar!(T, Representation)(def);
+				}
+				default:
+					assert(false);
+			}
+		}
+		else
 			static assert(false, "Unknown representation: " ~ Representation.stringof);
 	}
 }

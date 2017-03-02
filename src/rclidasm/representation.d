@@ -72,6 +72,10 @@ struct PropMapRepresentation(PropMaps...) {}
 /// Serialized like a struct, but with getters/setters.
 struct ContextRepresentation(alias beforeWrite, alias afterWrite, NextRepresentation = DefaultRepresentation) {}
 
+/// Choose a representation based on a condition.
+/// cond gets called with a pointer to the field (null when reading) and must return an index.
+struct SelectRepresentation(alias cond, Representations...) {}
+
 template RepresentationOf(P, F, string name)
 {
 	static if (is(Unqual!P == IMAGE_FILE_HEADER) && name == "TimeDateStamp")

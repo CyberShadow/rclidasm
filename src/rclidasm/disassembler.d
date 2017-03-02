@@ -225,6 +225,22 @@ private:
 			putVar!(T, NextRepresentation)(var, def);
 		}
 		else
+		static if (is(Representation == SelectRepresentation!(cond, Representations), alias cond, Representations...))
+		{
+		selectSwitch:
+			switch (cond(&var))
+			{
+				foreach (i, Representation; Representations)
+				{
+					case i:
+						putVar!(T, Representation)(var, def);
+						break selectSwitch;
+				}
+				default:
+					assert(false);
+			}
+		}
+		else
 			static assert(false, "Unknown representation: " ~ Representation.stringof);
 	}
 }
