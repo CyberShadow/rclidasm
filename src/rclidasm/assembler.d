@@ -306,7 +306,7 @@ private:
 							case name:
 							{
 								auto d = getter(def);
-								auto value = readVar!F(d);
+								auto value = readVar!(F, RepresentationOf!(T, F, name))(d);
 								setter(result, value);
 								break memberSwitch;
 							}
