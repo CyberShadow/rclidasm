@@ -64,6 +64,24 @@ enum ResourceType
 	RT_MANIFEST     = 24,
 }
 
+// From winver
+struct VS_FIXEDFILEINFO
+{
+    DWORD dwSignature;
+    DWORD dwStrucVersion;
+    DWORD dwFileVersionMS;
+    DWORD dwFileVersionLS;
+    DWORD dwProductVersionMS;
+    DWORD dwProductVersionLS;
+    DWORD dwFileFlagsMask;
+    DWORD dwFileFlags;
+    DWORD dwFileOS;
+    DWORD dwFileType;
+    DWORD dwFileSubtype;
+    DWORD dwFileDateMS;
+    DWORD dwFileDateLS;
+}
+
 struct DefaultRepresentation {}
 
 struct HexIntegerRepresentation {}
@@ -288,25 +306,27 @@ template RepresentationOf(P, F, string name)
 	else
 	static if (is(Unqual!F == VersionInfoNode))
 	{
-		static bool hasString(in ref VersionInfoNode f)
-		{
-			return f.type == 1 && f.value.length >= 2 && f.value.length % 2 == 0 && f.value[$-1] == 0 && f.value[$-2] == 0;
-		}
+		enum Type { bin, str, ver }
 
-		static const(wchar)[] getString(in ref VersionInfoNode f)
+		static Type getType(in ref VersionInfoNode f)
 		{
-			if (f.value.length)
-				return (cast(const(wchar)[])f.value)[0..$-1];
+			if (f.type == 1 && f.value.length >= 2 && f.value.length % 2 == 0 && f.value[$-1] == 0 && f.value[$-2] == 0)
+				return Type.str;
 			else
-				return null; // f.value.length will be 0 only when the representation of the default value is queried (for comparison)
+			if (f.type == 0 && f.key == "VS_VERSION_INFO" && f.value.length == VS_FIXEDFILEINFO.sizeof)
+				return Type.ver;
+			else
+				return Type.bin;
 		}
 
 		alias RepresentationOf = PropMapRepresentation!(
-			PropMap!("key"     , (in ref F f) => true         , (in ref F f) => f.key       , (ref Unqual!F f,    wchar[]        value) { f.key      = value               ; }),
-			PropMap!("type"    , (in ref F f) => true /*TODO*/, (in ref F f) => f.type      , (ref Unqual!F f,    ushort         value) { f.type     = value               ; }),
-			PropMap!("data"    , (in ref F f) => !hasString(f), (in ref F f) => f.value     , (ref Unqual!F f, in ubyte[]        value) { f.value    = value               ; }),
-			PropMap!("text"    , (in ref F f) =>  hasString(f), (in ref F f) => getString(f), (ref Unqual!F f, in wchar[]        value) { f.value    = (value ~ '\0').bytes; }),
-			PropMap!("children", (in ref F f) => true         , (in ref F f) => f.children  , (ref Unqual!F f, VersionInfoNode[] value) { f.children = value               ; }),
+			PropMap!("key"          , (in ref F f) => true                  , (in ref F f) => f.key                                                                               , (ref Unqual!F f,    wchar[]          value) { f.key      = value               ; }),
+			PropMap!("type"         , (in ref F f) => true /*TODO*/         , (in ref F f) => f.type                                                                              , (ref Unqual!F f,    ushort           value) { f.type     = value               ; }),
+			PropMap!("data"         , (in ref F f) => getType(f) == Type.bin, (in ref F f) => f.value                                                                             , (ref Unqual!F f, in ubyte[]          value) { f.value    = value               ; }),
+			// f.value.length will be 0 only when the representation of the default value is queried (for comparison)
+			PropMap!("text"         , (in ref F f) => getType(f) == Type.str, (in ref F f) => f.value.length ? (cast(const(wchar)[])f.value)[0..$-1]       : null                 , (ref Unqual!F f, in wchar[]          value) { f.value    = (value ~ '\0').bytes; }),
+			PropMap!("fixedFileInfo", (in ref F f) => getType(f) == Type.ver, (in ref F f) => f.value.length ? (cast(const(VS_FIXEDFILEINFO)[])f.value)[0] : VS_FIXEDFILEINFO.init, (ref Unqual!F f, in VS_FIXEDFILEINFO value) { f.value    = value.bytes.dup     ; }),
+			PropMap!("children"     , (in ref F f) => true                  , (in ref F f) => f.children                                                                          , (ref Unqual!F f, VersionInfoNode[]   value) { f.children = value               ; }),
 		);
 	}
 	else
