@@ -286,5 +286,29 @@ template RepresentationOf(P, F, string name)
 			PropMap!("versionInfo", (in ref F f) => resourceStack.length == 3 && resourceStack[0] == ResourceType.RT_VERSION, (in ref F f) => VersionInfoParser(f.data, new bool[f.data.length]).parse(), (ref Unqual!F f, ref VersionInfoNode* value) { if (value) f.data = VersionInfoCompiler(value).compile(); }),
 		);
 	else
+	static if (is(Unqual!F == VersionInfoNode))
+	{
+		static bool hasString(in ref VersionInfoNode f)
+		{
+			return f.type == 1 && f.value.length >= 2 && f.value.length % 2 == 0 && f.value[$-1] == 0 && f.value[$-2] == 0;
+		}
+
+		static const(wchar)[] getString(in ref VersionInfoNode f)
+		{
+			if (f.value.length)
+				return (cast(const(wchar)[])f.value)[0..$-1];
+			else
+				return null; // f.value.length will be 0 only when the representation of the default value is queried (for comparison)
+		}
+
+		alias RepresentationOf = PropMapRepresentation!(
+			PropMap!("key"     , (in ref F f) => true         , (in ref F f) => f.key       , (ref Unqual!F f,    wchar[]        value) { f.key      = value               ; }),
+			PropMap!("type"    , (in ref F f) => true /*TODO*/, (in ref F f) => f.type      , (ref Unqual!F f,    ushort         value) { f.type     = value               ; }),
+			PropMap!("data"    , (in ref F f) => !hasString(f), (in ref F f) => f.value     , (ref Unqual!F f, in ubyte[]        value) { f.value    = value               ; }),
+			PropMap!("text"    , (in ref F f) =>  hasString(f), (in ref F f) => getString(f), (ref Unqual!F f, in wchar[]        value) { f.value    = (value ~ '\0').bytes; }),
+			PropMap!("children", (in ref F f) => true         , (in ref F f) => f.children  , (ref Unqual!F f, VersionInfoNode[] value) { f.children = value               ; }),
+		);
+	}
+	else
 		alias RepresentationOf = DefaultRepresentation;
 }
