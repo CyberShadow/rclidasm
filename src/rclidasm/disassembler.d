@@ -78,9 +78,9 @@ private:
 				writer.putValue(text(var)); // TODO: Don't allocate
 			}
 			else
-			static if (is(T == string))
+			static if (is(T : const(char[])) || is(T : const(wchar[])) || is(T : const(dchar[])))
 			{
-				writer.putString(var);
+				writer.putString(var.to!string);
 			}
 			else
 			static if (is(T U : U*))

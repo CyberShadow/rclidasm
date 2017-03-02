@@ -115,11 +115,11 @@ private:
 				return value;
 			}
 			else
-			static if (is(T == string))
+			static if (is(T : const(char[])) || is(T : const(wchar[])) || is(T : const(dchar[])))
 			{
 				auto value = reader.readString();
 				reader.endNode();
-				return value;
+				return value.to!T;
 			}
 			else
 			static if (is(T U : U*))
