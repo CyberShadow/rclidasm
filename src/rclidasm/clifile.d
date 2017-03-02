@@ -21,6 +21,7 @@ module rclidasm.clifile;
 import std.exception;
 
 import ae.sys.windows.imports;
+import ae.sys.windows.pe.pe;
 import ae.utils.array;
 
 mixin(importWin32!(q{winnt}));
@@ -74,8 +75,6 @@ immutable IMAGE_NT_HEADERS32 cliPEHeader =
 		NumberOfRvaAndSizes : 0x10,
 	},
 };
-
-import ae.sys.windows.pe.pe;
 
 struct CLIFile
 {
