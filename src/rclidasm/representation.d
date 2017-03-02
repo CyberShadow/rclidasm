@@ -67,7 +67,7 @@ enum ResourceType
 // From winver
 struct VS_FIXEDFILEINFO
 {
-	DWORD dwSignature;
+	DWORD dwSignature = 0xFEEF04BD;
 	DWORD dwStrucVersion;
 	DWORD dwFileVersionMS;
 	DWORD dwFileVersionLS;
@@ -80,6 +80,46 @@ struct VS_FIXEDFILEINFO
 	DWORD dwFileSubtype;
 	DWORD dwFileDateMS;
 	DWORD dwFileDateLS;
+}
+
+enum VS_FF
+{
+	VS_FF_DEBUG        =  1,
+	VS_FF_PRERELEASE   =  2,
+	VS_FF_PATCHED      =  4,
+	VS_FF_PRIVATEBUILD =  8,
+	VS_FF_INFOINFERRED = 16,
+	VS_FF_SPECIALBUILD = 32
+}
+
+enum VOS
+{
+	VOS_UNKNOWN       =       0,
+	VOS_DOS           = 0x10000,
+	VOS_OS216         = 0x20000,
+	VOS_OS232         = 0x30000,
+	VOS_NT            = 0x40000,
+//	VOS__BASE         =       0,
+	VOS__WINDOWS16    =       1,
+	VOS__PM16         =       2,
+	VOS__PM32         =       3,
+	VOS__WINDOWS32    =       4,
+	VOS_DOS_WINDOWS16 = 0x10001,
+	VOS_DOS_WINDOWS32 = 0x10004,
+	VOS_OS216_PM16    = 0x20002,
+	VOS_OS232_PM32    = 0x30003,
+	VOS_NT_WINDOWS32  = 0x40004
+}
+
+enum VFT
+{
+	VFT_UNKNOWN    = 0,
+	VFT_APP        = 1,
+	VFT_DLL        = 2,
+	VFT_DRV        = 3,
+	VFT_FONT       = 4,
+	VFT_VXD        = 5,
+	VFT_STATIC_LIB = 7
 }
 
 struct DefaultRepresentation {}
@@ -102,6 +142,9 @@ struct SparseNamedIndexedArrayRepresentation(members...) {}
 
 /// Bitmask using constants which are not declared as an actual enum.
 struct ImplicitEnumBitmaskRepresentation(members...) {}
+
+/// Bitmask using an actual enum.
+alias EnumBitmaskRepresentation(Enum) = ImplicitEnumBitmaskRepresentation!(EnumMembers!Enum);
 
 /// Unix timestamp Representation.
 struct UnixTimestampRepresentation
@@ -316,7 +359,7 @@ template RepresentationOf(P, F, string name)
 			if (f.type == 1 && f.value.length >= 2 && f.value.length % 2 == 0 && f.value[$-1] == 0 && f.value[$-2] == 0)
 				return Type.str;
 			else
-			if (f.type == 0 && f.key == "VS_VERSION_INFO" && f.value.length == VS_FIXEDFILEINFO.sizeof)
+			if (f.type == 0 && f.key == "VS_VERSION_INFO" && f.value.length == VS_FIXEDFILEINFO.sizeof && (cast(VS_FIXEDFILEINFO*)f.value.ptr).dwSignature == VS_FIXEDFILEINFO.init.dwSignature)
 				return Type.ver;
 			else
 				return Type.bin;
@@ -332,6 +375,18 @@ template RepresentationOf(P, F, string name)
 			PropMap!("children"     , (in ref F f) => true                  , (in ref F f) => f.children                                                                          , (ref Unqual!F f, VersionInfoNode[]   value) { f.children = value               ; }),
 		);
 	}
+	else
+	static if (is(Unqual!P == VS_FIXEDFILEINFO) && name.isOneOf("dwSignature", "dwStrucVersion", "dwFileVersionMS", "dwFileVersionLS", "dwProductVersionMS", "dwProductVersionLS"))
+		alias RepresentationOf = HexIntegerRepresentation;
+	else
+	static if (is(Unqual!P == VS_FIXEDFILEINFO) && name.isOneOf("dwFileFlagsMask", "dwFileFlags"))
+		alias RepresentationOf = EnumBitmaskRepresentation!VS_FF;
+	else
+	static if (is(Unqual!P == VS_FIXEDFILEINFO) && name == "dwFileOS")
+		alias RepresentationOf = EnumRepresentation!VOS;
+	else
+	static if (is(Unqual!P == VS_FIXEDFILEINFO) && name == "dwFileType")
+		alias RepresentationOf = EnumRepresentation!VFT;
 	else
 		alias RepresentationOf = DefaultRepresentation;
 }
