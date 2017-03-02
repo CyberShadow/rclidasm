@@ -119,6 +119,18 @@ private:
 				return value;
 			}
 			else
+			static if (is(T U : U*))
+			{
+				if (reader.skipEndNode())
+					return null;
+				else
+				{
+					auto result = [readVar!U(def ? *def : initOf!U)].ptr;
+					// callee readVar will call endNode
+					return result;
+				}
+			}
+			else
 			static if (is(T : const(wchar)[]))
 			{
 				auto value = reader.readString().to!T;

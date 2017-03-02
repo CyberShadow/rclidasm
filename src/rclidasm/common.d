@@ -35,6 +35,9 @@ private template DeepUnqual(T)
 	static if (is(T A : A[]))
 		alias DeepUnqual = Unqual!A[];
 	else
+	static if (is(T U : U*))
+		alias DeepUnqual = Unqual!U*;
+	else
 		alias DeepUnqual = Unqual!T;
 }
 
@@ -53,6 +56,9 @@ DeepUnqual!T clone(T)(ref T var)
 			result.tupleof[i] = var.tupleof[i].clone();
 		return result;
 	}
+	else
+	static if (is(T U : U*))
+		return var ? [clone(*var)].ptr : null;
 	else
 	static if (is(T E : E[]))
 	{

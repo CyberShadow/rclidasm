@@ -80,6 +80,12 @@ private:
 				writer.putString(var);
 			}
 			else
+			static if (is(T U : U*))
+			{
+				if (var)
+					putVar!U(*var, def ? *def : initOf!U);
+			}
+			else
 			static if (is(T : const(ubyte)[]))
 				writer.putData(var);
 			else
