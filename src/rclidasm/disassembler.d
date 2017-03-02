@@ -218,6 +218,13 @@ private:
 			writer.endStruct();
 		}
 		else
+		static if (is(Representation == ContextRepresentation!(beforeWrite, afterWrite, NextRepresentation), alias beforeWrite, alias afterWrite, NextRepresentation))
+		{
+			beforeWrite(var);
+			scope(exit) afterWrite(var);
+			putVar!(T, NextRepresentation)(var, def);
+		}
+		else
 			static assert(false, "Unknown representation: " ~ Representation.stringof);
 	}
 }

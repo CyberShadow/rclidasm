@@ -320,6 +320,11 @@ private:
 			return result;
 		}
 		else
+		static if (is(Representation == ContextRepresentation!(enter, exit, NextRepresentation), alias enter, alias exit, NextRepresentation))
+		{
+			return readVar!(T, NextRepresentation)(def);
+		}
+		else
 			static assert(false, "Unknown representation: " ~ Representation.stringof);
 	}
 }

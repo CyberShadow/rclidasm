@@ -69,6 +69,9 @@ struct PropMap(string name, alias toInclude, alias getter, alias setter) {}
 /// Serialized like a struct, but with getters/setters.
 struct PropMapRepresentation(PropMaps...) {}
 
+/// Serialized like a struct, but with getters/setters.
+struct ContextRepresentation(alias beforeWrite, alias afterWrite, NextRepresentation = DefaultRepresentation) {}
+
 template RepresentationOf(P, F, string name)
 {
 	static if (is(Unqual!P == IMAGE_FILE_HEADER) && name == "TimeDateStamp")
