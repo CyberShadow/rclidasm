@@ -36,6 +36,33 @@ import rclidasm.common;
 import rclidasm.disassembler;
 import rclidasm.resources;
 
+// From winuser
+enum ResourceType
+{
+	RT_CURSOR       = 1,
+	RT_BITMAP       = 2,
+	RT_ICON         = 3,
+	RT_MENU         = 4,
+	RT_DIALOG       = 5,
+	RT_STRING       = 6,
+	RT_FONTDIR      = 7,
+	RT_FONT         = 8,
+	RT_ACCELERATOR  = 9,
+	RT_RCDATA       = 10,
+	RT_MESSAGETABLE = 11,
+
+	RT_GROUP_CURSOR = 12,
+	RT_GROUP_ICON   = 14,
+	RT_VERSION      = 16,
+	RT_DLGINCLUDE   = 17,
+	RT_PLUGPLAY     = 19,
+	RT_VXD          = 20,
+	RT_ANICURSOR    = 21,
+	RT_ANIICON      = 22,
+	RT_HTML         = 23,
+	RT_MANIFEST     = 24,
+}
+
 struct DefaultRepresentation {}
 
 struct HexIntegerRepresentation {}
@@ -75,6 +102,8 @@ struct ContextRepresentation(alias beforeWrite, alias afterWrite, NextRepresenta
 /// Choose a representation based on a condition.
 /// cond gets called with a pointer to the field (null when reading) and must return an index.
 struct SelectRepresentation(alias cond, Representations...) {}
+
+int[] resourceStack;
 
 template RepresentationOf(P, F, string name)
 {
@@ -227,13 +256,23 @@ template RepresentationOf(P, F, string name)
 		alias RepresentationOf = HexIntegerRepresentation;
 	else
 	static if (is(Unqual!F == ResourceDirectoryEntry))
-		alias RepresentationOf = PropMapRepresentation!(
-			PropMap!("Name"        , (in ref F f) =>  f.NameIsString   , (in ref F f) => f.Name        , (ref Unqual!F f,     WCHAR[]           value) { f.Name         = value; f.NameIsString    = true ; }),
-			PropMap!("NameOffset"  , (in ref F f) =>  f.NameIsString   , (in ref F f) => f.NameOffset  , (ref Unqual!F f,     DWORD             value) { f.NameOffset   = value; f.NameIsString    = true ; }),
-			PropMap!("Id"          , (in ref F f) => !f.NameIsString   , (in ref F f) => f.Id          , (ref Unqual!F f,     DWORD             value) { f.Id           = value; f.NameIsString    = false; }),
-			PropMap!("OffsetToData", (in ref F f) =>  true             , (in ref F f) => f.OffsetToData, (ref Unqual!F f,     DWORD             value) { f.OffsetToData = value;                            }),
-			PropMap!("directory"   , (in ref F f) =>  f.DataIsDirectory, (in ref F f) => f.directory   , (ref Unqual!F f, ref ResourceDirectory value) { f.directory    = value; f.DataIsDirectory = true ; }),
-			PropMap!("data"        , (in ref F f) => !f.DataIsDirectory, (in ref F f) => f.data        , (ref Unqual!F f, ref ResourceDataEntry value) { f.data         = value; f.DataIsDirectory = false; }),
+		alias RepresentationOf = ContextRepresentation!(
+			(in ref F f) { resourceStack ~= f.NameIsString ? 0 : f.Id; },
+			(in ref F f) { resourceStack = resourceStack[0..$-1]; },
+			PropMapRepresentation!(
+				PropMap!("Name"        , (in ref F f) =>  f.NameIsString   , (in ref F f) => f.Name        , (ref Unqual!F f,     WCHAR[]           value) { f.Name         = value; f.NameIsString    = true ; }),
+				PropMap!("NameOffset"  , (in ref F f) =>  f.NameIsString   , (in ref F f) => f.NameOffset  , (ref Unqual!F f,     DWORD             value) { f.NameOffset   = value; f.NameIsString    = true ; }),
+				PropMap!("Id"          , (in ref F f) => !f.NameIsString   , (in ref F f) => f.Id          , (ref Unqual!F f,     DWORD             value) { f.Id           = value; f.NameIsString    = false; }),
+				PropMap!("OffsetToData", (in ref F f) =>  true             , (in ref F f) => f.OffsetToData, (ref Unqual!F f,     DWORD             value) { f.OffsetToData = value;                            }),
+				PropMap!("directory"   , (in ref F f) =>  f.DataIsDirectory, (in ref F f) => f.directory   , (ref Unqual!F f, ref ResourceDirectory value) { f.directory    = value; f.DataIsDirectory = true ; }),
+				PropMap!("data"        , (in ref F f) => !f.DataIsDirectory, (in ref F f) => f.data        , (ref Unqual!F f, ref ResourceDataEntry value) { f.data         = value; f.DataIsDirectory = false; }),
+		));
+	else
+	static if (is(Unqual!P == ResourceDirectoryEntry) && name == "Id")
+		alias RepresentationOf = SelectRepresentation!(
+			(in F* f) => resourceStack.length > 1 ? 0 : 1,
+			DefaultRepresentation,
+			ImplicitEnumRepresentation!(EnumMembers!ResourceType),
 		);
 	else
 		alias RepresentationOf = DefaultRepresentation;
