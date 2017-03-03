@@ -35,11 +35,12 @@ import rclidasm.representation;
 
 T parseIntLiteral(T)(string s)
 {
+	alias O = OriginalType!T;
 	if (s.skipOver("0x"))
-		return s.to!T(16);
+		return s.to!O(16).to!T;
 	else
 	if (s.skipOver("0b"))
-		return s.to!T(2);
+		return s.to!O(2).to!T;
 	else
 		return s.to!T();
 }
