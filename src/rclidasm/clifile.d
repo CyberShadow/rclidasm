@@ -241,12 +241,13 @@ struct CLIFile
 			auto relRVA = header.dataDirectories[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress;
 			auto relAddr = rvaToFile(relRVA).to!uint;
 			ubyte[] relData;
-			foreach (blockFixups; fixups.chunkBy!((Fixup a, Fixup b) => a.rva / (1<<12) == b.rva / (1<<12)))
+			enum mask = (1<<12)-1;
+			foreach (blockFixups; fixups.chunkBy!((Fixup a, Fixup b) => (a.rva & ~mask) == (b.rva & ~mask)))
 			{
-				auto encoded = blockFixups.map!((ref fixup) { RelocFixup f; f.Type = fixup.type; f.Offset = fixup.rva & ((1<<12)-1); return f; }).array.bytes;
+				auto encoded = blockFixups.map!((ref fixup) { RelocFixup f; f.Type = fixup.type; f.Offset = fixup.rva & mask; return f; }).array.bytes;
 				if (encoded.length % 4 != 0)
 					encoded ~= initOf!RelocFixup.bytes;
-				auto header = RelocBlockHeader(blockFixups.front.rva & ~((1<<12)-1), (RelocBlockHeader.sizeof + encoded.length).to!uint);
+				auto header = RelocBlockHeader(blockFixups.front.rva & ~mask, (RelocBlockHeader.sizeof + encoded.length).to!uint);
 				relData ~= header.bytes ~ encoded;
 			}
 			result[relAddr .. relAddr + relData.length] = relData;
