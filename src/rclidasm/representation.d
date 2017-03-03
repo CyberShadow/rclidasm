@@ -122,6 +122,140 @@ enum VFT
 	VFT_STATIC_LIB = 7
 }
 
+enum LangID : ubyte
+{
+	LANG_NEUTRAL,
+	LANG_ARABIC,
+	LANG_BULGARIAN,
+	LANG_CATALAN,
+	LANG_CHINESE,
+	LANG_CZECH,
+	LANG_DANISH,
+	LANG_GERMAN,
+	LANG_GREEK,
+	LANG_ENGLISH,
+	LANG_SPANISH,
+	LANG_FINNISH,
+	LANG_FRENCH,
+	LANG_HEBREW,
+	LANG_HUNGARIAN,
+	LANG_ICELANDIC,
+	LANG_ITALIAN,
+	LANG_JAPANESE,
+	LANG_KOREAN,
+	LANG_DUTCH,
+	LANG_NORWEGIAN,
+	LANG_POLISH,
+	LANG_PORTUGUESE,    // = 0x16
+	LANG_ROMANIAN          = 0x18,
+	LANG_RUSSIAN,
+	LANG_CROATIAN,      // = 0x1A
+//	LANG_SERBIAN           = 0x1A,
+	LANG_BOSNIAN           = 0x1A,
+	LANG_SLOVAK,
+	LANG_ALBANIAN,
+	LANG_SWEDISH,
+	LANG_THAI,
+	LANG_TURKISH,
+	LANG_URDU,
+	LANG_INDONESIAN,
+	LANG_UKRAINIAN,
+	LANG_BELARUSIAN,
+	LANG_SLOVENIAN,
+	LANG_ESTONIAN,
+	LANG_LATVIAN,
+	LANG_LITHUANIAN,    // = 0x27
+//	LANG_FARSI             = 0x29,
+	LANG_PERSIAN           = 0x29,
+	LANG_VIETNAMESE,
+	LANG_ARMENIAN,
+	LANG_AZERI,
+	LANG_BASQUE,
+	LANG_LOWER_SORBIAN, // = 0x2E
+	LANG_UPPER_SORBIAN     = 0x2E,
+	LANG_MACEDONIAN,    // = 0x2F
+	LANG_TSWANA            = 0x32,
+	LANG_XHOSA             = 0x34,
+	LANG_ZULU,
+	LANG_AFRIKAANS,
+	LANG_GEORGIAN,
+	LANG_FAEROESE,
+	LANG_HINDI,
+	LANG_MALTESE,
+	LANG_SAMI,
+	LANG_IRISH,         // = 0x3C
+	LANG_MALAY             = 0x3E,
+	LANG_KAZAK,
+	LANG_KYRGYZ,
+	LANG_SWAHILI,       // = 0x41
+	LANG_UZBEK             = 0x43,
+	LANG_TATAR,
+	LANG_BENGALI,
+	LANG_PUNJABI,
+	LANG_GUJARATI,
+	LANG_ORIYA,
+	LANG_TAMIL,
+	LANG_TELUGU,
+	LANG_KANNADA,
+	LANG_MALAYALAM,
+	LANG_ASSAMESE,
+	LANG_MARATHI,
+	LANG_SANSKRIT,
+	LANG_MONGOLIAN,
+	LANG_TIBETAN,
+	LANG_WELSH,
+	LANG_KHMER,
+	LANG_LAO,           // = 0x54
+	LANG_GALICIAN          = 0x56,
+	LANG_KONKANI,
+	LANG_MANIPURI,
+	LANG_SINDHI,
+	LANG_SYRIAC,
+	LANG_SINHALESE,     // = 0x5B
+	LANG_INUKTITUT         = 0x5D,
+	LANG_AMHARIC,
+	LANG_TAMAZIGHT,
+	LANG_KASHMIRI,
+	LANG_NEPALI,
+	LANG_FRISIAN,
+	LANG_PASHTO,
+	LANG_FILIPINO,
+	LANG_DIVEHI,        // = 0x65
+	LANG_HAUSA             = 0x68,
+	LANG_YORUBA            = 0x6A,
+	LANG_QUECHUA,
+	LANG_SOTHO,
+	LANG_BASHKIR,
+	LANG_LUXEMBOURGISH,
+	LANG_GREENLANDIC,
+	LANG_IGBO,          // = 0x70
+	LANG_TIGRIGNA          = 0x73,
+	LANG_YI                = 0x78,
+	LANG_MAPUDUNGUN        = 0x7A,
+	LANG_MOHAWK            = 0x7C,
+	LANG_BRETON            = 0x7E,
+	LANG_UIGHUR            = 0x80,
+	LANG_MAORI,
+	LANG_OCCITAN,
+	LANG_CORSICAN,
+	LANG_ALSATIAN,
+	LANG_YAKUT,
+	LANG_KICHE,
+	LANG_KINYARWANDA,
+	LANG_WOLOF,         // = 0x88
+	LANG_DARI              = 0x8C,
+	LANG_MALAGASY,      // = 0x8D
+
+	LANG_INVARIANT         = 0x7F
+}
+
+struct VersionInfoTranslation
+{
+	LangID langID;
+	ubyte sublangID;
+	ushort charsetID;
+}
+
 struct DefaultRepresentation {}
 
 struct HexIntegerRepresentation {}
@@ -352,7 +486,7 @@ template RepresentationOf(P, F, string name)
 	else
 	static if (is(Unqual!F == VersionInfoNode))
 	{
-		enum Type { bin, str, ver }
+		enum Type { bin, str, trn, ver }
 
 		static Type getType(in ref VersionInfoNode f)
 		{
@@ -362,17 +496,24 @@ template RepresentationOf(P, F, string name)
 			if (f.type == 0 && f.key == "VS_VERSION_INFO" && f.value.length == VS_FIXEDFILEINFO.sizeof && (cast(VS_FIXEDFILEINFO*)f.value.ptr).dwSignature == VS_FIXEDFILEINFO.init.dwSignature)
 				return Type.ver;
 			else
+			if (f.type == 0 && f.key == "Translation" && f.value.length == VersionInfoTranslation.sizeof)
+				return Type.trn;
+			else
 				return Type.bin;
 		}
 
+		alias Ver = VS_FIXEDFILEINFO;
+		alias Trn = VersionInfoTranslation;
+
 		alias RepresentationOf = PropMapRepresentation!(
-			PropMap!("key"          , (in ref F f) => true                  , (in ref F f) => f.key                                                                               , (ref Unqual!F f,    wchar[]          value) { f.key      = value               ; }),
-			PropMap!("type"         , (in ref F f) => true /*TODO*/         , (in ref F f) => f.type                                                                              , (ref Unqual!F f,    ushort           value) { f.type     = value               ; }),
-			PropMap!("data"         , (in ref F f) => getType(f) == Type.bin, (in ref F f) => f.value                                                                             , (ref Unqual!F f, in ubyte[]          value) { f.value    = value               ; }),
+			PropMap!("key"          , (in ref F f) => true                  , (in ref F f) => f.key                                                        , (ref Unqual!F f,    wchar[]        value) { f.key      = value               ; }),
+			PropMap!("type"         , (in ref F f) => true /*TODO*/         , (in ref F f) => f.type                                                       , (ref Unqual!F f,    ushort         value) { f.type     = value               ; }),
+			PropMap!("data"         , (in ref F f) => getType(f) == Type.bin, (in ref F f) => f.value                                                      , (ref Unqual!F f, in ubyte[]        value) { f.value    = value               ; }),
 			// f.value.length will be 0 only when the representation of the default value is queried (for comparison)
-			PropMap!("text"         , (in ref F f) => getType(f) == Type.str, (in ref F f) => f.value.length ? (cast(const(wchar)[])f.value)[0..$-1]       : null                 , (ref Unqual!F f, in wchar[]          value) { f.value    = (value ~ '\0').bytes; }),
-			PropMap!("fixedFileInfo", (in ref F f) => getType(f) == Type.ver, (in ref F f) => f.value.length ? (cast(const(VS_FIXEDFILEINFO)[])f.value)[0] : VS_FIXEDFILEINFO.init, (ref Unqual!F f, in VS_FIXEDFILEINFO value) { f.value    = value.bytes.dup     ; }),
-			PropMap!("children"     , (in ref F f) => true                  , (in ref F f) => f.children                                                                          , (ref Unqual!F f, VersionInfoNode[]   value) { f.children = value               ; }),
+			PropMap!("text"         , (in ref F f) => getType(f) == Type.str, (in ref F f) => f.value.length ? (cast(const(wchar)[])f.value)[0..$-1] : null, (ref Unqual!F f, in wchar[]        value) { f.value    = (value ~ '\0').bytes; }),
+			PropMap!("fixedFileInfo", (in ref F f) => getType(f) == Type.ver, (in ref F f) => f.value.length ? (cast(const(Ver)[])f.value)[0] : Ver.init   , (ref Unqual!F f, in ref Ver        value) { f.value    = value.bytes.dup     ; }),
+			PropMap!("translation"  , (in ref F f) => getType(f) == Type.trn, (in ref F f) => f.value.length ? (cast(const(Trn)[])f.value)[0] : Trn.init   , (ref Unqual!F f, in ref Trn        value) { f.value    = value.bytes.dup     ; }),
+			PropMap!("children"     , (in ref F f) => true                  , (in ref F f) => f.children                                                   , (ref Unqual!F f, VersionInfoNode[] value) { f.children = value               ; }),
 		);
 	}
 	else
