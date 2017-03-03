@@ -529,5 +529,8 @@ template RepresentationOf(P, F, string name)
 	static if (is(Unqual!P == VS_FIXEDFILEINFO) && name == "dwFileType")
 		alias RepresentationOf = EnumRepresentation!VFT;
 	else
+	static if (is(Unqual!P == CLIFile.Fixup) && name == "rva")
+		alias RepresentationOf = HexIntegerRepresentation;
+	else
 		alias RepresentationOf = DefaultRepresentation;
 }
