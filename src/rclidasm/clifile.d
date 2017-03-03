@@ -18,6 +18,9 @@
 
 module rclidasm.clifile;
 
+import std.algorithm.iteration;
+import std.array;
+import std.bitmanip;
 import std.conv;
 import std.exception;
 
@@ -25,6 +28,7 @@ import ae.sys.windows.imports;
 import ae.sys.windows.pe.pe;
 import ae.utils.array;
 
+import rclidasm.common;
 import rclidasm.resources;
 
 mixin(importWin32!(q{winnt}));
@@ -90,30 +94,29 @@ struct CLIFile
 		IMAGE_NT_HEADERS32 ntHeaders = cliPEHeader;
 		IMAGE_DATA_DIRECTORY[] dataDirectories = new IMAGE_DATA_DIRECTORY[16];
 		IMAGE_SECTION_HEADER[] sections;
-
-		struct ImportFunction
-		{
-			ushort hint;
-			string name;
-		}
-
-		struct ImportModule
-		{
-			IMAGE_IMPORT_DESCRIPTOR descriptor;
-			ImportFunction functions;
-		}
-
-		ImportModule[] imports;
-
-		struct Fixup
-		{
-			ubyte type;
-			uint rva;
-		}
-		Fixup[] fixups;
 	}
 	Header header;
+
+	struct ImportFunction
+	{
+		ushort hint;
+		string name;
+	}
+	struct ImportModule
+	{
+		IMAGE_IMPORT_DESCRIPTOR descriptor;
+		ImportFunction functions;
+	}
+	ImportModule[] imports;
+
 	ResourceDirectory resources;
+
+	struct Fixup
+	{
+		ubyte type;
+		uint rva;
+	}
+	Fixup[] fixups;
 
 	// Non-zero data in the PE file that doesn't seem to be referenced
 	// by anything.
@@ -160,6 +163,29 @@ struct CLIFile
 				byteUsed[resAddr .. resAddr + resData.length],
 				header.dataDirectories[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress);
 			resources = parser.parse();
+		}
+
+		// Parse fixups
+		if (header.dataDirectories[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size)
+		{
+			auto data = pe.directoryData(IMAGE_DIRECTORY_ENTRY_BASERELOC);
+			auto addr = data.ptr - bytes.ptr;
+			assert(addr < bytes.length);
+			byteUsed[addr .. addr + data.length] = true;
+			while (data.length >= RelocBlockHeader.sizeof)
+			{
+				auto header = data[0..RelocBlockHeader.sizeof].fromBytes!RelocBlockHeader;
+				enforce(header.BlockSize <= data.length, "Out-of-bounds relocation block size");
+				enforce(header.BlockSize > RelocBlockHeader.sizeof, "Invalid relocation block size");
+				auto block = data[0..header.BlockSize];
+				enforce(block.length % 4 == 0, "Unaligned fixup block");
+				auto blockFixups = block[RelocBlockHeader.sizeof..$].fromBytes!(RelocFixup[]);
+				if (blockFixups[$-1] == RelocFixup.init)
+					blockFixups = blockFixups[0..$-1]; // Trim padding
+				foreach (f; blockFixups)
+					fixups ~= Fixup(f.Type, header.PageRVA + f.Offset);
+				data = data[block.length .. $];
+			}
 		}
 
 		// Record unaccounted data
@@ -209,6 +235,23 @@ struct CLIFile
 			result[resAddr .. resAddr + resData.length] = resData;
 		}
 
+		if (fixups.length)
+		{
+			enforce(header.dataDirectories[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size, "No relocation section");
+			auto relRVA = header.dataDirectories[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress;
+			auto relAddr = rvaToFile(relRVA).to!uint;
+			ubyte[] relData;
+			foreach (blockFixups; fixups.chunkBy!((Fixup a, Fixup b) => a.rva / (1<<12) == b.rva / (1<<12)))
+			{
+				auto encoded = blockFixups.map!((ref fixup) { RelocFixup f; f.Type = fixup.type; f.Offset = fixup.rva & ((1<<12)-1); return f; }).array.bytes;
+				if (encoded.length % 4 != 0)
+					encoded ~= initOf!RelocFixup.bytes;
+				auto header = RelocBlockHeader(blockFixups.front.rva & ~((1<<12)-1), (RelocBlockHeader.sizeof + encoded.length).to!uint);
+				relData ~= header.bytes ~ encoded;
+			}
+			result[relAddr .. relAddr + relData.length] = relData;
+		}
+
 		foreach (block; unaccountedData)
 		{
 			if (result.length < block.offset + block.data.length)
@@ -217,5 +260,19 @@ struct CLIFile
 		}
 
 		return result;
+	}
+
+private:
+	struct RelocBlockHeader
+	{
+		uint PageRVA, BlockSize;
+	}
+
+	struct RelocFixup
+	{
+		mixin(bitfields!(
+			ubyte , "Type"  ,  4,
+			ushort, "Offset", 12,
+		));
 	}
 }
