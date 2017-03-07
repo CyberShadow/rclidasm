@@ -85,6 +85,27 @@ immutable IMAGE_NT_HEADERS32 cliPEHeader =
 	},
 };
 
+// From CorHdr.h
+struct IMAGE_COR20_HEADER
+{
+    DWORD                   cb = IMAGE_COR20_HEADER.sizeof;
+    WORD                    MajorRuntimeVersion;
+    WORD                    MinorRuntimeVersion;
+    IMAGE_DATA_DIRECTORY    MetaData;
+    DWORD                   Flags;
+    union
+    {
+        DWORD               EntryPointToken;
+        DWORD               EntryPointRVA;
+    }
+    IMAGE_DATA_DIRECTORY    Resources;
+    IMAGE_DATA_DIRECTORY    StrongNameSignature;
+    IMAGE_DATA_DIRECTORY    CodeManagerTable;
+    IMAGE_DATA_DIRECTORY    VTableFixups;
+    IMAGE_DATA_DIRECTORY    ExportAddressTableJumps;
+    IMAGE_DATA_DIRECTORY    ManagedNativeHeader;
+}
+
 struct CLIFile
 {
 	size_t size;
@@ -122,6 +143,8 @@ struct CLIFile
 		uint rva;
 	}
 	Fixup[] fixups;
+
+	IMAGE_COR20_HEADER corHeader;
 
 	// Non-zero data in the PE file that doesn't seem to be referenced
 	// by anything.
@@ -255,6 +278,12 @@ struct CLIFile
 			}
 		}
 
+		if (header.dataDirectories[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].Size == IMAGE_COR20_HEADER.sizeof)
+		{
+			size_t corHeaderRVA = header.dataDirectories[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].VirtualAddress;
+			corHeader = readBytesAt!IMAGE_COR20_HEADER(corHeaderRVA);
+		}
+
 		// Record unaccounted data
 		for (size_t offset = 0; offset < bytes.length; offset++)
 			if (!byteUsed[offset] && bytes[offset] != 0)
@@ -365,6 +394,12 @@ struct CLIFile
 				put(initOf!uint, iatAddr);
 			}
 			put(initOf!IMAGE_IMPORT_DESCRIPTOR, impRVA, impEnd);
+		}
+
+		if (header.dataDirectories[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].Size == IMAGE_COR20_HEADER.sizeof)
+		{
+			size_t corRVA = header.dataDirectories[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].VirtualAddress;
+			put(corHeader, corRVA);
 		}
 
 		foreach (block; unaccountedData)
