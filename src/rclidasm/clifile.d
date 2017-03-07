@@ -23,6 +23,8 @@ import std.array;
 import std.bitmanip;
 import std.conv;
 import std.exception;
+import std.format;
+import std.traits;
 
 import ae.sys.windows.imports;
 import ae.sys.windows.pe.pe;
@@ -100,12 +102,15 @@ struct CLIFile
 	struct ImportFunction
 	{
 		ushort hint;
-		string name;
+		char[] name;
+		uint iltEntry;
+		uint iatEntry;
 	}
 	struct ImportModule
 	{
 		IMAGE_IMPORT_DESCRIPTOR descriptor;
-		ImportFunction functions;
+		char[] name;
+		ImportFunction[] functions;
 	}
 	ImportModule[] imports;
 
@@ -188,6 +193,68 @@ struct CLIFile
 			}
 		}
 
+		char[] readStringz(ref size_t rva)
+		{
+			auto addr = pe.rvaToFile(rva);
+			auto start = addr;
+			while (addr < bytes.length && bytes[addr])
+				addr++;
+			rva += (addr - start) + 1; // Advance by string length plus NUL terminator
+			byteUsed[start..addr] = true;
+			return cast(char[])bytes[start..addr];
+		}
+
+		ref T readBytesAt(T)(ref size_t rva, size_t end = size_t.max)
+		{
+			enforce(rva + T.sizeof <= end, "Address out-of-bounds while trying to read %s".format(T.stringof));
+			auto addr = pe.rvaToFile(rva);
+			enforce(addr + T.sizeof <= bytes.length, "Offset out-of-bounds while trying to read %s".format(T.stringof));
+			byteUsed[addr .. addr + T.sizeof] = true;
+			rva += T.sizeof;
+			return fromBytes!T(bytes[addr .. addr + T.sizeof]);
+		}
+
+		if (header.dataDirectories[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
+		{
+			size_t addr = pe.dataDirectories[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+			auto end = addr + header.dataDirectories[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
+			while (true)
+			{
+				enforce(addr + IMAGE_IMPORT_DESCRIPTOR.sizeof <= end, "End of data reached while trying to read ");
+				auto descriptor = readBytesAt!IMAGE_IMPORT_DESCRIPTOR(addr, end);
+				if (descriptor == IMAGE_IMPORT_DESCRIPTOR.init)
+					break;
+
+				ImportModule importModule;
+				importModule.descriptor = descriptor;
+				size_t nameAddr = descriptor.Name;
+				importModule.name = readStringz(nameAddr);
+
+				size_t iltAddr = descriptor.OriginalFirstThunk;
+				size_t iatAddr = descriptor.FirstThunk;
+
+				while (true)
+				{
+					auto iltEntry = readBytesAt!uint(iltAddr);
+					auto iatEntry = readBytesAt!uint(iatAddr);
+					if (!iltEntry)
+						break;
+
+					ImportFunction importFunction;
+					alias Hint = typeof(importFunction.hint); // ushort
+					size_t hintNameAddr = iltEntry;
+					importFunction.hint = readBytesAt!Hint(hintNameAddr);
+					importFunction.name = readStringz(hintNameAddr);
+					importFunction.iltEntry = iltEntry;
+					importFunction.iatEntry = iatEntry;
+
+					importModule.functions ~= importFunction;
+				}
+
+				imports ~= importModule;
+			}
+		}
+
 		// Record unaccounted data
 		for (size_t offset = 0; offset < bytes.length; offset++)
 			if (!byteUsed[offset] && bytes[offset] != 0)
@@ -251,6 +318,53 @@ struct CLIFile
 				relData ~= header.bytes ~ encoded;
 			}
 			result[relAddr .. relAddr + relData.length] = relData;
+		}
+
+		void put(T)(in ref T value, ref size_t rva, size_t end = size_t.max)
+		if (!hasIndirections!T)
+		{
+			enforce(rva + T.sizeof < end, "Address out-of-bounds while writing %s".format(T.stringof));
+			auto addr = rvaToFile(rva);
+			enforce(addr + T.sizeof <= result.length, "Offset out-of-bounds while writing %s".format(T.stringof));
+			result[addr .. addr + T.sizeof] = value.bytes[];
+			rva += T.sizeof;
+		}
+
+		void putStringz(in char[] str, ref size_t rva, size_t end = size_t.max)
+		{
+			foreach (c; str)
+				put(c, rva, end);
+			char c = 0;
+			put(c, rva, end);
+		}
+
+		if (imports.length)
+		{
+			size_t impRVA = enforce(header.dataDirectories[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress, "No import table section");
+			size_t impEnd = impRVA + header.dataDirectories[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
+
+			foreach (ref importModule; imports)
+			{
+				put(importModule.descriptor, impRVA, impEnd);
+				size_t nameRVA = importModule.descriptor.Name;
+				putStringz(importModule.name, nameRVA);
+
+				size_t iltAddr = importModule.descriptor.OriginalFirstThunk;
+				size_t iatAddr = importModule.descriptor.FirstThunk;
+
+				foreach (ref importFunction; importModule.functions)
+				{
+					put(importFunction.iltEntry, iltAddr);
+					put(importFunction.iatEntry, iatAddr);
+
+					size_t hintNameAddr = importFunction.iltEntry;
+					put(importFunction.hint, hintNameAddr);
+					putStringz(importFunction.name, hintNameAddr);
+				}
+				put(initOf!uint, iltAddr);
+				put(initOf!uint, iatAddr);
+			}
+			put(initOf!IMAGE_IMPORT_DESCRIPTOR, impRVA, impEnd);
 		}
 
 		foreach (block; unaccountedData)
