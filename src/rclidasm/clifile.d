@@ -270,7 +270,7 @@ struct CLIFile
 		size = bytes.length;
 	}
 
-	ubyte[] compile()
+	ubyte[] compile() const
 	{
 		ubyte[] result;
 		result ~= header.dosHeader.bytes;
