@@ -27,6 +27,35 @@ import ae.utils.array;
 
 mixin(importWin32!(q{winnt}));
 
+import rclidasm.versioninfo;
+
+// From winuser
+enum ResourceType
+{
+	RT_CURSOR       = 1,
+	RT_BITMAP       = 2,
+	RT_ICON         = 3,
+	RT_MENU         = 4,
+	RT_DIALOG       = 5,
+	RT_STRING       = 6,
+	RT_FONTDIR      = 7,
+	RT_FONT         = 8,
+	RT_ACCELERATOR  = 9,
+	RT_RCDATA       = 10,
+	RT_MESSAGETABLE = 11,
+
+	RT_GROUP_CURSOR = 12,
+	RT_GROUP_ICON   = 14,
+	RT_VERSION      = 16,
+	RT_DLGINCLUDE   = 17,
+	RT_PLUGPLAY     = 19,
+	RT_VXD          = 20,
+	RT_ANICURSOR    = 21,
+	RT_ANIICON      = 22,
+	RT_HTML         = 23,
+	RT_MANIFEST     = 24,
+}
+
 struct ResourceDirectory
 {
 	// Mix in IMAGE_RESOURCE_DIRECTORY's fields
@@ -63,6 +92,7 @@ struct ResourceDataEntry
 	mixin(mixStruct!IMAGE_RESOURCE_DATA_ENTRY);
 
 	ubyte[] data;
+	VersionInfoNode* versionInfo;
 }
 
 struct ResourceParser
@@ -84,6 +114,7 @@ private:
 	ubyte[] data;
 	bool[] byteUsed;
 	uint rva;
+	int[] stack;
 
 	ResourceDirectory readDirectory(uint offset)
 	{
@@ -114,6 +145,8 @@ private:
 			else
 				entry.Id = winEntry.Name; // Use .Name instead of .Id to save all 32 bits
 
+			stack ~= entry.NameIsString ? 0 : entry.Id;
+
 			entry.DataIsDirectory = winEntry.DataIsDirectory;
 			if (entry.DataIsDirectory)
 			{
@@ -125,6 +158,8 @@ private:
 				entry.data = readDirectoryData(winEntry.OffsetToData);
 				entry.OffsetToData = winEntry.OffsetToData;
 			}
+
+			stack = stack[0..$-1];
 		}
 
 		return dir;
@@ -141,8 +176,8 @@ private:
 		dirData.OffsetToData -= rva; // Make serialized representation relative to the resource section start
 		auto start = dirData.OffsetToData;
 		enforce(start + winDirData.Size <= data.length, "Out-of-bounds directory data offset");
-		dirData.data = data[start .. start + winDirData.Size];
-		byteUsed[start .. start + winDirData.Size] = true;
+
+		parseData(dirData, data[start .. start + winDirData.Size], byteUsed[start .. start + winDirData.Size]);
 
 		return dirData;
 	}
@@ -157,6 +192,20 @@ private:
 		byteUsed[offset .. strEnd] = true;
 		auto firstChar = &winStr._NameString;
 		return firstChar[0..winStr.Length];
+	}
+
+	void parseData(ref ResourceDataEntry entry, ubyte[] data, bool[] byteUsed)
+	{
+		if (stack.length == 3 && stack[0] == ResourceType.RT_VERSION)
+		{
+			auto parser = VersionInfoParser(data, byteUsed);
+			entry.versionInfo = parser.parse();
+		}
+		else
+		{
+			entry.data = data;
+			byteUsed[] = true;
+		}
 	}
 }
 
@@ -227,7 +276,7 @@ private:
 			f = __traits(getMember, dirData, __traits(identifier, IMAGE_RESOURCE_DATA_ENTRY.tupleof[i]));
 		winData.OffsetToData += rva; // Serialized representation is relative to the resource section start
 		putBytes(winData.bytes, offset);
-		putBytes(dirData.data, dirData.OffsetToData);
+		putBytes(compileData(dirData), dirData.OffsetToData);
 	}
 
 	void putString(in WCHAR[] str, size_t offset)
@@ -246,6 +295,17 @@ private:
 		enforce(!use.canFind(true), "Overlapping resource data");
 		data[offset .. offset + bytes.length] = bytes;
 		use[] = true;
+	}
+
+	static const(ubyte)[] compileData(in ref ResourceDataEntry entry)
+	{
+		if (entry.versionInfo)
+		{
+			enforce(entry.data is null, "Redundant resource data");
+			return VersionInfoCompiler(entry.versionInfo).compile();
+		}
+		else
+			return entry.data;
 	}
 }
 

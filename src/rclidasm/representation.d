@@ -37,33 +37,6 @@ import rclidasm.disassembler;
 import rclidasm.resources;
 import rclidasm.versioninfo;
 
-// From winuser
-enum ResourceType
-{
-	RT_CURSOR       = 1,
-	RT_BITMAP       = 2,
-	RT_ICON         = 3,
-	RT_MENU         = 4,
-	RT_DIALOG       = 5,
-	RT_STRING       = 6,
-	RT_FONTDIR      = 7,
-	RT_FONT         = 8,
-	RT_ACCELERATOR  = 9,
-	RT_RCDATA       = 10,
-	RT_MESSAGETABLE = 11,
-
-	RT_GROUP_CURSOR = 12,
-	RT_GROUP_ICON   = 14,
-	RT_VERSION      = 16,
-	RT_DLGINCLUDE   = 17,
-	RT_PLUGPLAY     = 19,
-	RT_VXD          = 20,
-	RT_ANICURSOR    = 21,
-	RT_ANIICON      = 22,
-	RT_HTML         = 23,
-	RT_MANIFEST     = 24,
-}
-
 // From winver
 struct VS_FIXEDFILEINFO
 {
@@ -472,16 +445,6 @@ template RepresentationOf(P, F, string name)
 			(in F* f) => resourceStack.length > 1 ? 0 : 1,
 			DefaultRepresentation,
 			EnumRepresentation!ResourceType,
-		);
-	else
-	static if (is(Unqual!F == ResourceDataEntry))
-		alias RepresentationOf = PropMapRepresentation!(
-			PropMap!("OffsetToData", (in ref F f) => true, (in ref F f) => f.OffsetToData, (ref Unqual!F f, DWORD value) { f.OffsetToData = value; }),
-			PropMap!("Size"        , (in ref F f) => true, (in ref F f) => f.Size        , (ref Unqual!F f, DWORD value) { f.Size         = value; }),
-			PropMap!("CodePage"    , (in ref F f) => true, (in ref F f) => f.CodePage    , (ref Unqual!F f, DWORD value) { f.CodePage     = value; }),
-			PropMap!("Reserved"    , (in ref F f) => true, (in ref F f) => f.Reserved    , (ref Unqual!F f, DWORD value) { f.Reserved     = value; }),
-			PropMap!("data",        (in ref F f) => resourceStack.length != 3 || resourceStack[0] != ResourceType.RT_VERSION, (in ref F f) => f.data, (ref Unqual!F f, ubyte[] value) { f.data = value; }),
-			PropMap!("versionInfo", (in ref F f) => resourceStack.length == 3 && resourceStack[0] == ResourceType.RT_VERSION, (in ref F f) => VersionInfoParser(f.data, new bool[f.data.length]).parse(), (ref Unqual!F f, ref VersionInfoNode* value) { if (value) f.data = VersionInfoCompiler(value).compile(); }),
 		);
 	else
 	static if (is(Unqual!F == VersionInfoNode))
