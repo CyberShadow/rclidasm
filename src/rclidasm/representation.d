@@ -473,13 +473,13 @@ template RepresentationOf(P, F, string name)
 
 		alias RepresentationOf = PropMapRepresentation!(
 			// f.value.length will be 0 only when the representation of the default value is queried (for comparison)
-			PropMap!("key"          , (in ref MF f) => true                  , (ref MF f) => f.key                                                        , (ref M!(Unqual!F) f,     M!(wchar          []) value) { f.key      = value               ; }),
-			PropMap!("type"         , (in ref MF f) => true /*TODO*/         , (ref MF f) => f.type                                                       , (ref M!(Unqual!F) f,     M!(ushort           ) value) { f.type     = value               ; }),
-			PropMap!("data"         , (in ref MF f) => getType(f) == Type.bin, (ref MF f) => f.value                                                      , (ref M!(Unqual!F) f,     M!(const(ubyte)   []) value) { f.value    = value.value         ; }),
+			PropMap!("key"          , (in ref MF f) => true                  , (ref MF f) => f.key                                , (ref M!(Unqual!F) f,     M!(wchar          []) value) { f.key      = value               ; }),
+			PropMap!("type"         , (in ref MF f) => true /*TODO*/         , (ref MF f) => f.type                               , (ref M!(Unqual!F) f,     M!(ushort           ) value) { f.type     = value               ; }),
+			PropMap!("data"         , (in ref MF f) => getType(f) == Type.bin, (ref MF f) => f.value                              , (ref M!(Unqual!F) f,     M!(const(ubyte)   []) value) { f.value    = value.value         ; }),
 			PropMap!("text"         , (in ref MF f) => getType(f) == Type.str, (ref MF f) => maybe((cast(wchar[])f.value)[0..$-1]), (ref M!(Unqual!F) f,     M!(wchar          []) value) { f.value    = (value ~ '\0').bytes; }),
-			PropMap!("fixedFileInfo", (in ref MF f) => getType(f) == Type.ver, (ref MF f) => maybe((cast(Ver[])f.value)[0]), (ref M!(Unqual!F) f, ref M!(Ver              ) value) { f.value    = value.bytes.dup     ; }),
-			PropMap!("translation"  , (in ref MF f) => getType(f) == Type.trn, (ref MF f) => maybe((cast(Trn[])f.value)[0]), (ref M!(Unqual!F) f, ref M!(Trn              ) value) { f.value    = value.bytes.dup     ; }),
-			PropMap!("children"     , (in ref MF f) => true                  , (ref MF f) => f.children                                                   , (ref M!(Unqual!F) f,     M!(VersionInfoNode[]) value) { f.children = value               ; }),
+			PropMap!("fixedFileInfo", (in ref MF f) => getType(f) == Type.ver, (ref MF f) => maybe((cast(Ver[])f.value)[0])       , (ref M!(Unqual!F) f, ref M!(Ver              ) value) { f.value    = value.bytes.dup     ; }),
+			PropMap!("translation"  , (in ref MF f) => getType(f) == Type.trn, (ref MF f) => maybe((cast(Trn[])f.value)[0])       , (ref M!(Unqual!F) f, ref M!(Trn              ) value) { f.value    = value.bytes.dup     ; }),
+			PropMap!("children"     , (in ref MF f) => true                  , (ref MF f) => f.children                           , (ref M!(Unqual!F) f,     M!(VersionInfoNode[]) value) { f.children = value               ; }),
 		);
 	}
 	else
