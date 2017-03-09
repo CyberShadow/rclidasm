@@ -53,12 +53,12 @@ struct Assembler
 		reader = Reader(src);
 	}
 
-	CLIFile assemble()
+	Maybe!CLIFile assemble()
 	{
 		try
 		{
 			reader.expectTag("file");
-			return readVar!CLIFile().value;
+			return readVar!CLIFile();
 		}
 		catch (Exception e)
 		{
@@ -191,6 +191,7 @@ private:
 			{
 				reader.beginStruct();
 				Maybe!T result;
+				result.isSet = true;
 				while (!reader.skipEndStruct())
 				{
 					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
@@ -244,6 +245,7 @@ private:
 		{
 			reader.beginStruct();
 			Maybe!T result;
+			result.isSet = true;
 			alias E = typeof(T.init[0]);
 			while (!reader.skipEndStruct())
 			{
@@ -255,8 +257,10 @@ private:
 					{
 						enum name = __traits(identifier, members[i]);
 						case name:
-							enforce(result.length > member, "%s array too small to fit member %s".format(T.stringof, name));
+							if (result.length <= member)
+								result.length = member + 1;
 							result[member] = readVar!E();
+							assert(isSet(result[member]));
 							break memberSwitch;
 					}
 					default:
@@ -268,7 +272,7 @@ private:
 		else
 		static if (is(Representation == ImplicitEnumBitmaskRepresentation!members, members...))
 		{
-			Maybe!T result;
+			T result;
 			while (!reader.skipEndNode())
 			{
 				auto word = reader.readWord();
@@ -290,7 +294,7 @@ private:
 					}
 				}
 			}
-			return result;
+			return result.maybe;
 		}
 		else
 		static if (is(Representation == UnixTimestampRepresentation))
@@ -319,6 +323,7 @@ private:
 		{
 			reader.beginStruct();
 			Maybe!T result;
+			result.isSet = true;
 			while (!reader.skipEndStruct())
 			{
 				auto tag = reader.readTag();
