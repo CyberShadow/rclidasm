@@ -27,6 +27,7 @@ import std.traits;
 
 import rclidasm.common;
 import rclidasm.clifile;
+import rclidasm.maybe;
 import rclidasm.representation;
 import rclidasm.writer;
 
@@ -41,25 +42,26 @@ struct Disassembler
 	}
 
 private:
-	const(CLIFile)* file;
+	Maybe!CLIFile* file;
 
 	Writer writer;
 
-	void putVar(T, Representation = DefaultRepresentation)(ref T var, in ref T def = initOf!T)
+	void putVar(M, Representation = DefaultRepresentation)(ref M var)
 	{
+		alias T = Unmaybify!M;
 		static if (is(Representation == DefaultRepresentation))
 		{
 			static if (is(T == struct))
 			{
 				writer.beginStruct();
-				foreach (i, ref f; var.tupleof)
+				foreach (i, ref f; var._maybeGetValue.tupleof)
 				{
-					if (f == def.tupleof[i])
+					if (!isSet(f))
 						continue;
 
-					enum name = __traits(identifier, var.tupleof[i]);
+					enum name = __traits(identifier, T.tupleof[i]);
 					writer.beginTag(name);
-					putVar!(typeof(f), RepresentationOf!(T, typeof(f), name))(f, def.tupleof[i]);
+					putVar!(typeof(f), RepresentationOf!(T, Unmaybify!(typeof(f)), name))(f);
 					writer.endTag();
 				}
 				writer.endStruct();
@@ -86,7 +88,7 @@ private:
 			static if (is(T U : U*))
 			{
 				if (var)
-					putVar!(U, RepresentationOf!(T, U, null))(*var, def ? *def : initOf!U);
+					putVar!(Maybe!U, RepresentationOf!(T, U, null))(*var);
 			}
 			else
 			static if (is(T : const(ubyte)[]))
@@ -98,12 +100,11 @@ private:
 			static if (is(T A : A[]))
 			{
 				writer.beginStruct();
-				foreach (i, ref A a; var)
+				foreach (i, ref Maybe!A a; var)
 				{
 					writer.beginTag(Unqual!A.stringof);
-					auto aDef = i < def.length ? def[i] : A.init;
-					if (a != aDef)
-						putVar!(A, RepresentationOf!(T, A, null))(a, aDef);
+					if (isSet(a))
+						putVar!(Maybe!A, RepresentationOf!(T, A, null))(a);
 					writer.endTag();
 				}
 				writer.endStruct();
@@ -121,7 +122,7 @@ private:
 		static if (is(Representation == CStrArrRepresentation))
 		{
 			auto arr = var[];
-			while (arr.length && arr[$-1] == def[arr.length-1])
+			while (arr.length && !arr[$-1])
 				arr = arr[0..$-1];
 			writer.putString(cast(char[])arr);
 		}
@@ -147,8 +148,7 @@ private:
 			writer.beginStruct();
 			foreach (i, ref a; var)
 			{
-				auto aDef = i < def.length ? def[i] : typeof(a).init;
-				if (a == aDef)
+				if (!isSet(a))
 					continue;
 			memberSwitch:
 				switch (i)
@@ -162,7 +162,7 @@ private:
 					default:
 						writer.beginTag(text(i));
 				}
-				putVar!(typeof(a))(a, aDef);
+				putVar!(typeof(a))(a);
 				writer.endTag();
 			}
 			writer.endStruct();
@@ -193,12 +193,12 @@ private:
 		static if (is(Representation == UnionRepresentation!fieldIndex, uint fieldIndex))
 		{
 			writer.beginStruct();
-			foreach (i, ref f; var.tupleof)
+			foreach (i, ref f; var._maybeGetValue.tupleof)
 				static if (i == fieldIndex)
 				{
 					enum name = __traits(identifier, var.tupleof[i]);
 					writer.beginTag(name);
-					putVar!(typeof(f), RepresentationOf!(T, typeof(f), name))(f, def.tupleof[i]);
+					putVar!(typeof(f), RepresentationOf!(T, Unmaybify!(typeof(f)), name))(f);
 					writer.endTag();
 				}
 			writer.endStruct();
@@ -214,11 +214,10 @@ private:
 						continue;
 					alias F = typeof(getter(var));
 					auto f = getter(var);
-					auto d = getter(def);
-					if (f != d)
+					if (isSet(f))
 					{
 						writer.beginTag(name);
-						putVar!(F, RepresentationOf!(T, F, name))(f, d);
+						putVar!(F, RepresentationOf!(T, Unmaybify!F, name))(f);
 						writer.endTag();
 					}
 				}
@@ -231,7 +230,7 @@ private:
 		{
 			beforeWrite(var);
 			scope(exit) afterWrite(var);
-			putVar!(T, NextRepresentation)(var, def);
+			putVar!(M, NextRepresentation)(var);
 		}
 		else
 		static if (is(Representation == SelectRepresentation!(cond, Representations), alias cond, Representations...))
@@ -242,7 +241,7 @@ private:
 				foreach (i, Representation; Representations)
 				{
 					case i:
-						putVar!(T, Representation)(var, def);
+						putVar!(M, Representation)(var);
 						break selectSwitch;
 				}
 				default:

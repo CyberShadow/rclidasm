@@ -30,6 +30,7 @@ import std.traits;
 
 import rclidasm.clifile;
 import rclidasm.common;
+import rclidasm.maybe;
 import rclidasm.reader;
 import rclidasm.representation;
 
@@ -57,7 +58,7 @@ struct Assembler
 		try
 		{
 			reader.expectTag("file");
-			return readVar!CLIFile();
+			return readVar!CLIFile().value;
 		}
 		catch (Exception e)
 		{
@@ -68,28 +69,30 @@ struct Assembler
 private:
 	Reader reader;
 
-	T readVar(T, Representation = DefaultRepresentation)(in ref T def = initOf!T)
+	Maybe!T readVar(T, Representation = DefaultRepresentation)()
 	{
+		static assert(!is(T == Maybe!U, U), "Trying to readVar a Maybe: " ~ T.stringof);
 		static if (is(Representation == DefaultRepresentation))
 		{
 			static if (is(T == struct))
 			{
 				reader.beginStruct();
-				T var = def.clone();
+				Maybe!T var;
+				var.isSet = true;
+
 				while (!reader.skipEndStruct())
 				{
 					auto name = reader.readTag();
 				structSwitch:
 					switch (name)
 					{
-						foreach (i, ref f; var.tupleof)
+						foreach (i, f; T.init.tupleof)
 						{
-							alias F = typeof(f);
-							enum fieldName = __traits(identifier, var.tupleof[i]);
+							alias F = typeof(T.tupleof[i]);
+							enum fieldName = __traits(identifier, initOf!T.tupleof[i]);
 							case fieldName:
 							{
-								static assert(is(typeof(f = f)), F.stringof);
-								var.tupleof[i] = readVar!(F, RepresentationOf!(T, F, fieldName))(def.tupleof[i]);
+								var._maybeGetValue.tupleof[i] = readVar!(F, RepresentationOf!(T, F, fieldName))();
 								break structSwitch;
 							}
 						}
@@ -107,31 +110,39 @@ private:
 			}
 			else
 			static if (is(T == bool))
-				return true;
+				return true.maybe;
 			else
 			static if (is(T : ulong))
 			{
 				auto value = reader.readWord().parseIntLiteral!T();
 				reader.endNode();
-				return value;
+				return value.maybe;
 			}
 			else
 			static if (is(T : const(char[])) || is(T : const(wchar[])) || is(T : const(dchar[])))
 			{
 				auto value = reader.readString();
 				reader.endNode();
-				return value.to!T;
+				return value.to!T.maybe;
 			}
 			else
 			static if (is(T U : U*))
 			{
 				if (reader.skipEndNode())
-					return null;
+					return null.maybe!T;
 				else
 				{
-					auto result = [readVar!(U, RepresentationOf!(T, U, null))(def ? *def : initOf!U)].ptr;
-					// callee readVar will call endNode
+					Maybe!U contents = readVar!(U, RepresentationOf!(T, U, null))();
+					Maybe!T result;
+					if (contents.isSet)
+					{
+						auto contentsPtr = [contents].ptr;
+						result = contentsPtr;
+					}
+					else
+						result = null;
 					return result;
+					// callee readVar will call endNode
 				}
 			}
 			else
@@ -149,7 +160,7 @@ private:
 				while (!reader.skipEndData())
 					result ~= Base64.decode(reader.readData());
 				reader.endNode();
-				return result;
+				return result.maybe;
 			}
 			else
 			static if (is(const(T) == const(void[])))
@@ -165,11 +176,11 @@ private:
 			static if (is(T : A[n], A, size_t n))
 			{
 				reader.beginStruct();
-				T result;
+				Maybe!T result;
 				foreach (i, ref f; result)
 				{
 					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
-					f = readVar!(A, RepresentationOf!(T, A, null))(def[i]);
+					f = readVar!(A, RepresentationOf!(T, A, null))();
 				}
 				reader.endStruct();
 				reader.endNode();
@@ -179,12 +190,11 @@ private:
 			static if (is(T A : A[]))
 			{
 				reader.beginStruct();
-				T result;
+				Maybe!T result;
 				while (!reader.skipEndStruct())
 				{
 					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
-					const A aDef = result.length < def.length ? def[result.length] : A.init;
-					result ~= readVar!(A, RepresentationOf!(T, A, null))(aDef);
+					result ~= readVar!(A, RepresentationOf!(T, A, null))();
 				}
 				reader.endNode();
 				return result;
@@ -195,17 +205,17 @@ private:
 		else
 		static if (is(Representation == HexIntegerRepresentation))
 		{
-			return readVar!T(def);
+			return readVar!T();
 		}
 		else
 		static if (is(Representation == CStrArrRepresentation))
 		{
 			auto s = reader.readString();
-			T result = def;
+			T result;
 			enforce(s.length <= result.length, "String too long");
 			foreach (i, c; s)
 				result[i] = c;
-			return result;
+			return result.maybe;
 		}
 		else
 		static if (is(Representation == ImplicitEnumRepresentation!members, members...))
@@ -214,7 +224,7 @@ private:
 			reader.endNode();
 
 			if (word[0].isDigit())
-				return parseIntLiteral!T(word);
+				return parseIntLiteral!T(word).maybe;
 			else
 			{
 				switch (word)
@@ -222,7 +232,7 @@ private:
 					foreach (i, member; members)
 					{
 						case __traits(identifier, members[i]):
-							return member;
+							return member.maybe!T();
 					}
 					default:
 						throw new Exception("Unknown bitmask value: %s", word);
@@ -233,8 +243,8 @@ private:
 		static if (is(Representation == SparseNamedIndexedArrayRepresentation!members, members...))
 		{
 			reader.beginStruct();
-			T result = def.clone();
-			alias E = typeof(result[0]);
+			Maybe!T result;
+			alias E = typeof(T.init[0]);
 			while (!reader.skipEndStruct())
 			{
 				auto tag = reader.readTag();
@@ -246,7 +256,7 @@ private:
 						enum name = __traits(identifier, members[i]);
 						case name:
 							enforce(result.length > member, "%s array too small to fit member %s".format(T.stringof, name));
-							result[member] = readVar!E(member < def.length ? def[member] : initOf!E);
+							result[member] = readVar!E();
 							break memberSwitch;
 					}
 					default:
@@ -258,7 +268,7 @@ private:
 		else
 		static if (is(Representation == ImplicitEnumBitmaskRepresentation!members, members...))
 		{
-			T result;
+			Maybe!T result;
 			while (!reader.skipEndNode())
 			{
 				auto word = reader.readWord();
@@ -288,7 +298,7 @@ private:
 			auto dateStr = reader.readWord();
 			auto timeStr = reader.readWord();
 			reader.endNode();
-			return (dateStr ~ " " ~ timeStr).parseTime!(UnixTimestampRepresentation.timeFormat).toUnixTime.to!T();
+			return (dateStr ~ " " ~ timeStr).parseTime!(UnixTimestampRepresentation.timeFormat).toUnixTime.to!T().maybe;
 		}
 		else
 		static if (is(Representation == UnionRepresentation!fieldIndex, uint fieldIndex))
@@ -299,16 +309,16 @@ private:
 				static if (i == fieldIndex)
 				{
 					reader.expectTag(__traits(identifier, result.tupleof[i]));
-					f = readVar!(typeof(f))(def.tupleof[i]);
+					f = readVar!(typeof(f))();
 				}
 			reader.endStruct();
-			return result;
+			return result.maybe;
 		}
 		else
 		static if (is(Representation == PropMapRepresentation!PropMaps, PropMaps...))
 		{
 			reader.beginStruct();
-			T result = def.clone();
+			Maybe!T result;
 			while (!reader.skipEndStruct())
 			{
 				auto tag = reader.readTag();
@@ -318,11 +328,14 @@ private:
 					foreach (RPropMap; PropMaps)
 						static if (is(RPropMap == PropMap!(name, toInclude, getter, setter), string name, alias toInclude, alias getter, alias setter))
 						{
-							alias F = typeof(clone(initOf!(typeof(getter(result)))));
+							alias FM = typeof(getter(result));
+							static if (is(FM == Maybe!U, U))
+								alias F = U;
+							else
+								static assert(false, "Not a Maybe: " ~ FM.stringof);
 							case name:
 							{
-								auto d = getter(def);
-								auto value = readVar!(F, RepresentationOf!(T, F, name))(d);
+								auto value = readVar!(F, RepresentationOf!(T, F, name))();
 								setter(result, value);
 								break memberSwitch;
 							}
@@ -338,7 +351,7 @@ private:
 		else
 		static if (is(Representation == ContextRepresentation!(enter, exit, NextRepresentation), alias enter, alias exit, NextRepresentation))
 		{
-			return readVar!(T, NextRepresentation)(def);
+			return readVar!(T, NextRepresentation)();
 		}
 		else
 		static if (is(Representation == SelectRepresentation!(cond, Representations), alias cond, Representations...))
@@ -348,7 +361,7 @@ private:
 				foreach (i, Representation; Representations)
 				{
 					case i:
-						return readVar!(T, Representation)(def);
+						return readVar!(T, Representation)();
 				}
 				default:
 					assert(false);

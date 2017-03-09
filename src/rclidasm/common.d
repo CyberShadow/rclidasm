@@ -23,6 +23,8 @@ import std.traits;
 
 import ae.utils.array;
 
+import rclidasm.maybe;
+
 bool isTagChar(char c)
 {
 	return isAlphaNum(c) || c.isOneOf("._");
@@ -30,19 +32,38 @@ bool isTagChar(char c)
 
 static immutable initOf(T) = T.init;
 
+/*
 private template DeepUnqual(T)
 {
-	static if (is(T A : A[]))
+	static if (is(T : Maybe!U, U))
+		alias DeepUnqual = Unqual!(Maybe!(DeepUnqual!U));
+	else
+	static if (is(T A == A[]))
 		alias DeepUnqual = Unqual!A[];
 	else
-	static if (is(T U : U*))
+	static if (is(T U == U*))
 		alias DeepUnqual = Unqual!U*;
 	else
 		alias DeepUnqual = Unqual!T;
 }
+*/
 
+/*
 DeepUnqual!T clone(T)(ref T var)
 {
+	static if (is(T == Maybe!U, U))
+	{
+		if (var.isSet)
+		{
+			auto copy = clone(var.value);
+			Maybe!(DeepUnqual!U) result;
+			result.value = copy;
+			return result;
+		}
+		else
+			return DeepUnqual!T.init;
+	}
+	else
 	static if (!hasIndirections!T)
 	{
 		Unqual!T result = var;
@@ -57,10 +78,10 @@ DeepUnqual!T clone(T)(ref T var)
 		return result;
 	}
 	else
-	static if (is(T U : U*))
+	static if (is(T U == U*))
 		return var ? [clone(*var)].ptr : null;
 	else
-	static if (is(T E : E[]))
+	static if (is(T E == E[]))
 	{
 		static if (!hasIndirections!E)
 			return var.dup;
@@ -75,3 +96,4 @@ DeepUnqual!T clone(T)(ref T var)
 	else
 		static assert(false, "Don't know how to clone " ~ T.stringof);
 }
+*/
