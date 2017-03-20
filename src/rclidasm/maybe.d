@@ -24,6 +24,8 @@ import ae.utils.text.ascii;
 import std.format;
 import std.traits;
 
+import rclidasm.common : DeepUnqual, initOf;
+
 /// A recursively-converting implementation of Maybe
 struct Maybe(T)
 {
@@ -69,7 +71,7 @@ if (is(T == Maybe!U, U))
 }
 
 /// Get this Maybe's underlying value
-Unmaybify!M value(M)(auto ref M maybe) @property
+inout(Unmaybify!M) value(M)(auto ref inout(M) maybe) @property
 if (is(M == Maybe!U, U))
 {
 	alias T = Unmaybify!M;
@@ -85,8 +87,11 @@ if (is(M == Maybe!U, U))
 		T result;
 		auto vp = &(maybe._maybeGetValue());
 		foreach (i, ref f; (*vp).tupleof)
-			result.tupleof[i] = value(f);
-		return result;
+		{
+			auto v = value(f);
+			result.tupleof[i] = cast(DeepUnqual!(typeof(v)))v;
+		}
+		return cast(inout)result;
 	}
 	else
 	static if (is(T U : U*))
@@ -95,18 +100,21 @@ if (is(M == Maybe!U, U))
 	static if (is(T : A[n], A, size_t n))
 	{
 		A[n] result;
-		foreach (i, ref Maybe!A a; maybe._maybeGetValue)
-			result[i] = value(a);
+		foreach (i, ref inout(Maybe!A) a; maybe._maybeGetValue)
+			result[i] = cast()value(a);
 		return result;
 	}
 	else
 	static if (is(T A : A[]))
 	{
-		Maybe!A[] v = maybe._maybeGetValue;
-		A[] result = new A[v.length];
-		foreach (i, ref Maybe!A a; v)
-			result[i] = value(a);
-		return result;
+		inout(Maybe!A)[] arr = maybe._maybeGetValue;
+		A[] result = new A[arr.length];
+		foreach (i, ref inout(Maybe!A) a; arr)
+		{
+			auto v = value(a);
+			result[i] = cast(DeepUnqual!(typeof(v)))v;
+		}
+		return cast(inout)result;
 	}
 	else
 		static assert(false, "Don't know how to get value of " ~ M.stringof);
@@ -117,6 +125,8 @@ Maybe!T maybe(T)(auto ref T value)
 {
 	return Maybe!T(value);
 }
+
+enum Maybe!T nothing(T) = Maybe!T();
 
 template Unmaybify(M)
 {
