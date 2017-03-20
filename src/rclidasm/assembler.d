@@ -247,25 +247,34 @@ private:
 			Maybe!T result;
 			result.isSet = true;
 			alias E = typeof(T.init[0]);
+			alias M = typeof(members[0]);
 			while (!reader.skipEndStruct())
 			{
+				M index;
 				auto tag = reader.readTag();
-			memberSwitch:
-				switch (tag)
+				if (tag[0].isDigit())
+					index = parseIntLiteral!M(tag);
+				else
 				{
-					foreach (i, member; members)
+				memberSwitch:
+					switch (tag)
 					{
-						enum name = __traits(identifier, members[i]);
-						case name:
-							if (result.length <= member)
-								result.length = member + 1;
-							result[member] = readVar!E();
-							assert(isSet(result[member]));
-							break memberSwitch;
+						foreach (i, member; members)
+						{
+							enum name = __traits(identifier, members[i]);
+							case name:
+								index = member;
+								break memberSwitch;
+						}
+						default:
+							throw new Exception("Unknown array index constant: %s".format(tag));
 					}
-					default:
-						throw new Exception("Unknown array index constant: %s", tag);
 				}
+
+				if (result.length <= index)
+					result.length = index + 1;
+				result[index] = readVar!E();
+				assert(isSet(result[index]));
 			}
 			return result;
 		}
