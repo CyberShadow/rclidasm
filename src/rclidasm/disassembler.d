@@ -82,7 +82,7 @@ private:
 			else
 			static if (is(T : const(char[])) || is(T : const(wchar[])) || is(T : const(dchar[])))
 			{
-				writer.putString(var.to!string);
+				writer.putString(var.get(null).to!string);
 			}
 			else
 			static if (is(T U : U*))
@@ -122,9 +122,12 @@ private:
 		static if (is(Representation == CStrArrRepresentation))
 		{
 			auto arr = var[];
-			while (arr.length && !arr[$-1])
+			while (arr.length && !arr[$-1].isSet)
 				arr = arr[0..$-1];
-			writer.putString(cast(char[])arr);
+			char[var.length] s;
+			foreach (i, c; arr)
+				s[i] = c.get(typeof(c.value).init);
+			writer.putString(s);
 		}
 		else
 		static if (is(Representation == ImplicitEnumRepresentation!members, members...))
@@ -196,7 +199,7 @@ private:
 			foreach (i, ref f; var._maybeGetValue.tupleof)
 				static if (i == fieldIndex)
 				{
-					enum name = __traits(identifier, var.tupleof[i]);
+					enum name = __traits(identifier, typeof(var._maybeGetValue).tupleof[i]);
 					writer.beginTag(name);
 					putVar!(typeof(f), RepresentationOf!(T, Unmaybify!(typeof(f)), name))(f);
 					writer.endTag();
