@@ -340,7 +340,7 @@ private:
 				switch (tag)
 				{
 					foreach (RPropMap; PropMaps)
-						static if (is(RPropMap == PropMap!(name, toInclude, getter, setter), string name, alias toInclude, alias getter, alias setter))
+						static if (is(RPropMap == PropMap!(name, getter, setter), string name, alias getter, alias setter))
 						{
 							alias FM = typeof(getter(result));
 							static if (is(FM == Maybe!U, U))

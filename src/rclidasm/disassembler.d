@@ -208,10 +208,8 @@ private:
 		{
 			writer.beginStruct();
 			foreach (RPropMap; PropMaps)
-				static if (is(RPropMap == PropMap!(name, toInclude, getter, setter), string name, alias toInclude, alias getter, alias setter))
+				static if (is(RPropMap == PropMap!(name, getter, setter), string name, alias getter, alias setter))
 				{
-					if (!toInclude(var))
-						continue;
 					alias F = typeof(getter(var));
 					auto f = getter(var);
 					if (isSet(f))
