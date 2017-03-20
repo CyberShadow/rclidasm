@@ -18,6 +18,7 @@
 
 module rclidasm.tokenizer;
 
+import std.conv;
 import std.exception;
 
 import rclidasm.common;
@@ -109,8 +110,9 @@ private:
 	string s;
 	int line, column;
 
-	void advance(size_t num = 1)
+	string advance(size_t num = 1)
 	{
+		enforce(s.length >= num, "Unexpected EOF");
 		foreach (char c; s[0..num])
 			if (c == '\n')
 			{
@@ -119,7 +121,10 @@ private:
 			}
 			else
 				column++;
+
+		auto result = s[0..num];
 		s = s[num..$];
+		return result;
 	}
 
 	static bool isWordChar(char c)
@@ -156,6 +161,13 @@ private:
 						result = s[0..p];
 					advance(p+1);
 					p = 0;
+
+					enforce(s.length, "Unexpected EOF within string escape");
+					if (s[0] == 'x')
+					{
+						advance(1);
+						result ~= to!ubyte(advance(2), 16);
+					}
 					break;
 				default:
 					p++;
