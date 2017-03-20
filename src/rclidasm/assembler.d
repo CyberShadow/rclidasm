@@ -177,6 +177,7 @@ private:
 			{
 				reader.beginStruct();
 				Maybe!T result;
+				result.isSet = true;
 				foreach (i, ref f; result)
 				{
 					enforce(reader.readTag() == Unqual!A.stringof, "%s tag expected".format(Unqual!A.stringof));
