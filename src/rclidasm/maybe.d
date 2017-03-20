@@ -120,6 +120,24 @@ if (is(M == Maybe!U, U))
 		static assert(false, "Don't know how to get value of " ~ M.stringof);
 }
 
+/// Return the Maybe's value, with a fallback if it doesn't have one
+inout(T) get(T)(auto ref inout Maybe!T m, auto ref inout(T) def)
+{
+	static if (is(T == struct) || is(T == union))
+	{
+		T result;
+		auto vp = &(m._maybeGetValue());
+		foreach (i, ref f; (*vp).tupleof)
+		{
+			auto v = get(f, def.tupleof[i]);
+			result.tupleof[i] = cast(DeepUnqual!(typeof(v)))v;
+		}
+		return cast(inout)result;
+	}
+	else
+		return isSet(m) ? value(m) : def;
+}
+
 /// Create and return new Maybe with this value
 Maybe!T maybe(T)(auto ref T value)
 {
@@ -280,4 +298,5 @@ unittest
 	Maybe!S ms;
 	ms = S.init;
 	S s = value(ms);
+	get(ms, s);
 }
