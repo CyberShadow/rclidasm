@@ -154,6 +154,40 @@ template Unmaybify(M)
 		static assert(false, "Not a Maybe: " ~ M.stringof);
 }
 
+enum mixTypeMapStruct(T, string tplName) = {
+	string s;
+	foreach (i; RangeTuple!(T.init.tupleof.length))
+	{
+		enum name = __traits(identifier, T.tupleof[i]);
+		s ~= tplName ~ "!(typeof({ T* value; return (*value).tupleof[" ~ toDec(i) ~ "]; }())) " ~ name ~ ";\n";
+	}
+	return s;
+}();
+
+
+/// Convert a composite type such that all of its direct subtypes are replaced with Tpl!T
+private template TypeMap(T, alias Tpl)
+{
+	static assert(is(Unqual!T == T), "Qualified TypeMap: " ~ T.stringof); // Watch me
+	static if (is(T == Tpl!U, U))
+		static assert(false, "Recursive TypeMap of " ~ T.stringof); // Almost always a mistake
+	else
+	static if (is(T == struct))
+		struct TypeMap { mixin(mixTypeMapStruct!(T, q{Tpl})); }
+	else
+	static if (is(T U : U*))
+		alias TypeMap = Tpl!U*;
+	else
+	static if (is(T : A[n], A, size_t n))
+		alias TypeMap = Tpl!A[n];
+	else
+	static if (is(T A : A[]))
+		alias TypeMap = Tpl!A[];
+	else
+		static assert(false, "Don't know how to TypeMap " ~ T.stringof);
+}
+
+
 /// Convert a type such that all of its subtypes are replaced with Maybe!T
 private template Maybify(T)
 {
@@ -165,15 +199,7 @@ private template Maybify(T)
 	{
 		struct Maybify
 		{
-			mixin({
-				string s;
-				foreach (i; RangeTuple!(T.init.tupleof.length))
-				{
-					enum name = __traits(identifier, T.tupleof[i]);
-					s ~= "Maybe!(typeof({ T value; return value.tupleof[" ~ toDec(i) ~ "]; }())) " ~ name ~ ";\n";
-				}
-				return s;
-			}());
+			mixin(mixTypeMapStruct!(T, q{Maybe}));
 
 			this(ref T value)
 			{
@@ -191,22 +217,13 @@ private template Maybify(T)
 		}
 	}
 	else
-	static if (is(T U : U*))
-		alias Maybify = Maybe!U*;
-	else
-	static if (__traits(isScalar, T))
+	static if (__traits(isArithmetic, T))
 		alias Maybify = T;
 	else
-	static if (is(T : A[n], A, size_t n))
-		alias Maybify = Maybe!A[n];
+	static if (is(T AA == AA[]) && __traits(isArithmetic, AA))
+		alias Maybify = AA[];
 	else
-	static if (is(T A : A[]))
-		static if (__traits(isScalar, A))
-			alias Maybify = A[];
-		else
-			alias Maybify = Maybe!A[];
-	else
-		static assert(false, "Don't know how to Maybify " ~ T.stringof);
+		alias Maybify = TypeMap!(T, Maybe);
 }
 
 auto ref Maybify!T maybify(T)(ref T value)
