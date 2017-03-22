@@ -70,6 +70,40 @@ if (is(T == Maybe!U, U))
 	return maybe._maybeIsSet;
 }
 
+/// Map a composite type's values using func
+inout(R) fmap(alias func, R, T)(ref inout(T) v)
+{
+	static if (is(T == struct) || is(T == union))
+	{
+		R result;
+		foreach (i, ref f; v.tupleof)
+			result.tupleof[i] = cast(DeepUnqual!(typeof(func(f))))func(f);
+		return cast(inout)result;
+	}
+	else
+	static if (is(T U : U*))
+		return v ? [func(*v)].ptr : null;
+	else
+	static if (is(T : A[n], A, size_t n))
+	{
+		R result;
+		foreach (i, ref inout(A) a; v)
+			result[i] = cast()func(a);
+		return result;
+	}
+	else
+	static if (is(T A : A[]))
+	{
+		alias E = typeof(R.init[0]);
+		R result = new E[v.length];
+		foreach (i, ref inout(A) a; v)
+			result[i] = cast(DeepUnqual!(typeof(func(a))))func(a);
+		return cast(inout)result;
+	}
+	else
+		static assert(false, "Don't know how to fmap " ~ T.stringof ~ " (to " ~ R.stringof ~ ")");
+}
+
 /// Get this Maybe's underlying value
 inout(Unmaybify!M) value(M)(auto ref inout(M) maybe) @property
 if (is(M == Maybe!U, U))
@@ -82,42 +116,7 @@ if (is(M == Maybe!U, U))
 	static if (is(Maybify!T == T))
 		return maybe._maybeGetValue;
 	else
-	static if (is(T == struct) || is(T == union))
-	{
-		T result;
-		auto vp = &(maybe._maybeGetValue());
-		foreach (i, ref f; (*vp).tupleof)
-		{
-			auto v = value(f);
-			result.tupleof[i] = cast(DeepUnqual!(typeof(v)))v;
-		}
-		return cast(inout)result;
-	}
-	else
-	static if (is(T U : U*))
-		return maybe._maybeGetValue ? [value(*maybe._maybeGetValue)].ptr : null;
-	else
-	static if (is(T : A[n], A, size_t n))
-	{
-		A[n] result;
-		foreach (i, ref inout(Maybe!A) a; maybe._maybeGetValue)
-			result[i] = cast()value(a);
-		return result;
-	}
-	else
-	static if (is(T A : A[]))
-	{
-		inout(Maybe!A)[] arr = maybe._maybeGetValue;
-		A[] result = new A[arr.length];
-		foreach (i, ref inout(Maybe!A) a; arr)
-		{
-			auto v = value(a);
-			result[i] = cast(DeepUnqual!(typeof(v)))v;
-		}
-		return cast(inout)result;
-	}
-	else
-		static assert(false, "Don't know how to get value of " ~ M.stringof);
+		return fmap!(.value, T)(maybe._maybeGetValue);
 }
 
 /// Return the Maybe's value, with a fallback if it doesn't have one
