@@ -138,9 +138,12 @@ inout(T) get(T)(auto ref inout Maybe!T m, auto ref inout(T) def)
 }
 
 /// Create and return new Maybe with this value
-Maybe!T maybe(T)(auto ref T value)
+inout(Maybe!T) maybe(T)(auto ref inout(T) value)
 {
-	return Maybe!T(value);
+	// TODO: Better way to deal with this constness mess?
+	alias U = DeepUnqual!T;
+	auto m = Maybe!U(*cast(U*)(&value));
+	return *cast(inout(Maybe!T)*)&m;
 }
 
 enum Maybe!T nothing(T) = Maybe!T();
@@ -237,26 +240,7 @@ auto ref Maybify!T maybify(T)(ref T value)
 	static if (is(T == struct) || is(T == union))
 		return M(value);
 	else
-	static if (is(T U : U*))
-		return value ? [maybe(*value)].ptr : null;
-	else
-	static if (is(T : A[n], A, size_t n))
-	{
-		Maybe!A[n] result;
-		foreach (i, ref A a; value)
-			result[i] = a;
-		return result;
-	}
-	else
-	static if (is(T A : A[]))
-	{
-		Maybe!A[] result = new Maybe!A[value.length];
-		foreach (i, ref A a; value)
-			result[i] = a;
-		return result;
-	}
-	else
-		static assert(false, "Don't know how to maybify " ~ T.stringof);
+		return fmap!(maybe, typeof(return))(value);
 }
 
 import core.exception : AssertError;
