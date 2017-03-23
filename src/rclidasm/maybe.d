@@ -18,9 +18,6 @@
 
 module rclidasm.maybe;
 
-import ae.utils.meta;
-import ae.utils.text.ascii;
-
 import std.format;
 import std.traits;
 
@@ -121,17 +118,6 @@ template Unmaybify(M)
 	else
 		static assert(false, "Not a Maybe: " ~ M.stringof);
 }
-
-enum mixTypeMapStruct(T, string tplName) = {
-	string s;
-	foreach (i; RangeTuple!(T.init.tupleof.length))
-	{
-		enum name = __traits(identifier, T.tupleof[i]);
-		s ~= tplName ~ "!(typeof({ T* value; return (*value).tupleof[" ~ toDec(i) ~ "]; }())) " ~ name ~ ";\n";
-	}
-	return s;
-}();
-
 
 /// Convert a type such that all of its subtypes are replaced with Maybe!T
 private template Maybify(T)

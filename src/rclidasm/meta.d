@@ -20,6 +20,9 @@ module rclidasm.meta;
 
 import std.traits;
 
+import ae.utils.meta : RangeTuple;
+import ae.utils.text.ascii : toDec;
+
 template DeepUnqual(T)
 {
 	static if (is(T A == A[]))
@@ -30,6 +33,16 @@ template DeepUnqual(T)
 	else
 		alias DeepUnqual = Unqual!T;
 }
+
+enum mixTypeMapStruct(T, string tplName) = {
+	string s;
+	foreach (i; RangeTuple!(T.init.tupleof.length))
+	{
+		enum name = __traits(identifier, T.tupleof[i]);
+		s ~= tplName ~ "!(typeof({ T* value; return (*value).tupleof[" ~ toDec(i) ~ "]; }())) " ~ name ~ ";\n";
+	}
+	return s;
+}();
 
 /// Convert a composite type such that all of its direct subtypes are replaced with Tpl!T
 template TypeMap(T, alias Tpl)
