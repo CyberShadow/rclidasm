@@ -134,29 +134,6 @@ enum mixTypeMapStruct(T, string tplName) = {
 }();
 
 
-/// Convert a composite type such that all of its direct subtypes are replaced with Tpl!T
-private template TypeMap(T, alias Tpl)
-{
-	static assert(is(Unqual!T == T), "Qualified TypeMap: " ~ T.stringof); // Watch me
-	static if (is(T == Tpl!U, U))
-		static assert(false, "Recursive TypeMap of " ~ T.stringof); // Almost always a mistake
-	else
-	static if (is(T == struct))
-		struct TypeMap { mixin(mixTypeMapStruct!(T, q{Tpl})); }
-	else
-	static if (is(T U : U*))
-		alias TypeMap = Tpl!U*;
-	else
-	static if (is(T : A[n], A, size_t n))
-		alias TypeMap = Tpl!A[n];
-	else
-	static if (is(T A : A[]))
-		alias TypeMap = Tpl!A[];
-	else
-		static assert(false, "Don't know how to TypeMap " ~ T.stringof);
-}
-
-
 /// Convert a type such that all of its subtypes are replaced with Maybe!T
 private template Maybify(T)
 {
