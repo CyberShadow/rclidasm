@@ -69,7 +69,7 @@ template TypeMap(T, alias Tpl)
 /// Map a composite type's values using func
 inout(R) fmap(alias func, R, T)(ref inout(T) v)
 {
-	static if (is(T == struct) || is(T == union))
+	static if (is(T == struct))
 	{
 		R result;
 		foreach (i, ref f; v.tupleof)
@@ -98,4 +98,86 @@ inout(R) fmap(alias func, R, T)(ref inout(T) v)
 	}
 	else
 		static assert(false, "Don't know how to fmap " ~ T.stringof ~ " (to " ~ R.stringof ~ ")");
+}
+
+/// Wrap a template instantiation into a struct,
+/// to allow recursive template instantiations.
+struct StructWrap(alias Tpl, T)
+{
+	Tpl!T field;
+}
+
+template EnforceNoUnionsImpl(T)
+{
+	static if (is(T == union))
+		static assert(false, T.stringof ~ " is a union");
+	else
+	static if (is(T == struct))
+	{
+		bool testUnions()
+		{
+			foreach (i, f; T.init.tupleof)
+				static assert(!i || T.tupleof[i].offsetof > T.tupleof[i-1].offsetof, "Inline union detected in " ~ T.stringof);
+			return true;
+		}
+		static assert(testUnions()); // Force evaluation
+		alias EnforceNoUnionsImpl = TypeMap!(T, .EnforceNoUnions);
+	}
+	else
+	static if (isNumeric!T)
+		alias EnforceNoUnionsImpl = T;
+	else
+		alias EnforceNoUnionsImpl = TypeMap!(T, .EnforceNoUnions);
+}
+
+alias EnforceNoUnions(T) = StructWrap!(EnforceNoUnionsImpl, T);
+
+unittest
+{
+	struct S { int[] arr; }
+	static assert(is(EnforceNoUnions!S));
+}
+
+unittest
+{
+	struct S { int a, b; }
+	static assert(is(EnforceNoUnions!S));
+}
+
+unittest
+{
+	struct S { S[] arr; }
+	static assert(is(EnforceNoUnions!S));
+}
+
+unittest
+{
+	union S { int a, b; }
+	static assert(!is(EnforceNoUnions!S));
+}
+
+unittest
+{
+	struct S { int a, b; union { int c, d; } }
+	static assert(!is(EnforceNoUnions!S));
+}
+
+unittest
+{
+	struct A { struct { int a, b; } }
+	struct B { A* a; }
+	struct C { B[] b; }
+	struct D { C[2] c; }
+	struct E { D d; }
+	static assert(is(EnforceNoUnions!D));
+}
+
+unittest
+{
+	struct A { union { int a, b; } }
+	struct B { A* a; }
+	struct C { B[] b; }
+	struct D { C[2] c; }
+	struct E { D d; }
+	static assert(!is(EnforceNoUnions!D));
 }
