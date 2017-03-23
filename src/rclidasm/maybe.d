@@ -24,7 +24,6 @@ import ae.utils.text.ascii;
 import std.format;
 import std.traits;
 
-import rclidasm.common : DeepUnqual;
 import rclidasm.meta;
 
 /// A recursively-converting implementation of Maybe

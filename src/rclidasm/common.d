@@ -32,20 +32,6 @@ bool isTagChar(char c)
 
 static immutable initOf(T) = T.init;
 
-template DeepUnqual(T)
-{
-	static if (is(T : Maybe!U, U))
-		alias DeepUnqual = Unqual!(Maybe!(DeepUnqual!U));
-	else
-	static if (is(T A == A[]))
-		alias DeepUnqual = Unqual!A[];
-	else
-	static if (is(T U == U*))
-		alias DeepUnqual = Unqual!U*;
-	else
-		alias DeepUnqual = Unqual!T;
-}
-
 /*
 DeepUnqual!T clone(T)(ref T var)
 {

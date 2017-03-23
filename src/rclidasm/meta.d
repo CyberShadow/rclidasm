@@ -20,7 +20,16 @@ module rclidasm.meta;
 
 import std.traits;
 
-import rclidasm.common : DeepUnqual;
+template DeepUnqual(T)
+{
+	static if (is(T A == A[]))
+		alias DeepUnqual = Unqual!A[];
+	else
+	static if (is(T U == U*))
+		alias DeepUnqual = Unqual!U*;
+	else
+		alias DeepUnqual = Unqual!T;
+}
 
 /// Convert a composite type such that all of its direct subtypes are replaced with Tpl!T
 template TypeMap(T, alias Tpl)
